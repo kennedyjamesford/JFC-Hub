@@ -68,3 +68,4 @@ async function authBoot(){
 
 boot();
 authBoot();
+document.querySelector('#signOut').onclick=async()=>{await db.auth.signOut();localStorage.removeItem('jfc-user');location.reload()};
