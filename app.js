@@ -1,3 +1,6 @@
+const SUPABASE_URL = "https://ykjtkrfpqulybssyshhr.supabase.co";
+const SUPABASE_KEY = "sb_publishable_c7pKOlu7-jxlZBDJNLcRCw_VPIuy52u";
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const team=[['Sam','Director'],['Jamie','Director'],['Ben','Construction Director'],['Kennedy','Admin + Socials'],['Dylan','Area Manager'],['Les','Plant Manager'],['Lloyd','Groundworker'],['Jack','Apprentice'],['Aiden','Supervisor'],['Rhys','Groundworker'],['Mark','Groundworker'],['James','Supervisor'],['Jamie P','Groundworker'],['Stan','Groundworker'],['Corey','Groundworker — Machine'],['Craig','Groundworker']];
 const jobs=[['The Old Mill','Richmond','Active','68%'],['Scorton Meadows','Scorton','Active','42%'],['Riverside Barns','Darlington','Planning','15%']];let user=null,clockedIn=false,view='home';
 const $=s=>document.querySelector(s);const initials=n=>n.split(' ').map(x=>x[0]).join('');
@@ -16,4 +19,52 @@ function management(){header('MANAGEMENT OVERVIEW','Company overview');$('#conte
 function social(){header('MARKETING DESK','Social media content');$('#content').innerHTML=`<div class="page"><div class="topline"><div><h3>Content planner</h3><p class="section-intro">Turn the team’s site progress into professional, on-brand updates.</p></div><button class="secondary" onclick="showModal('Create social post')">+ Create post</button></div><div class="grid cols-2"><div class="panel"><h3>Draft post · Instagram & LinkedIn</h3><p style="line-height:1.7">Another productive week at <b>Scorton Meadows</b>. The team are progressing the drainage installation and preparing the site for the next concrete pour — keeping things moving safely, efficiently and to programme.<br><br><span style="color:var(--blue)">#JamesFordConstruction #Groundworks #CivilEngineering #Yorkshire</span></p><div class="modal-actions"><button class="secondary" onclick="toast('Post saved as draft')">Save draft</button><button class="primary" style="background:var(--blue);color:#fff" onclick="toast('Post queued for approval')">Queue for approval</button></div></div><div class="panel"><h3>Content opportunities</h3><div class="list"><div class="row"><span class="row-icon">▣</span><div class="grow"><b>New site photos available</b><div class="sub">3 photos from Scorton Meadows — ideal for a progress update</div></div><button class="link" onclick="go('photos')">Use</button></div><div class="row"><span class="row-icon">✓</span><div class="grow"><b>Safety milestone</b><div class="sub">96% H&S compliance this month</div></div><button class="link" onclick="toast('Milestone draft created')">Draft</button></div></div></div></div></div>`}
 
 function toggleClock(){clockedIn=!clockedIn;localStorage.setItem('jfc-clockedIn',clockedIn?'yes':'no');toast(clockedIn?'You are clocked in':'You are clocked out');go(view)}
+async function authBoot(){
+  const { data: { session } } = await db.auth.getSession();
+
+  if(session){
+    const { data: staff } = await db
+      .from("staff")
+      .select("*")
+      .eq("auth_user_id", session.user.id)
+      .single();
+
+    if(staff){
+      select([staff.full_name, staff.role]);
+      return;
+    }
+  }
+
+  $("#teamGrid").innerHTML = `
+    <form id="loginForm" class="login-form">
+      <label>Email address</label>
+      <input id="loginEmail" type="email" required placeholder="Your JFC email">
+      <label>Password</label>
+      <input id="loginPassword" type="password" required placeholder="Your password">
+      <button class="primary" type="submit">Sign in</button>
+      <p id="loginError" class="login-error"></p>
+    </form>
+  `;
+
+  $("#loginForm").addEventListener("submit", async e => {
+    e.preventDefault();
+
+    const email = $("#loginEmail").value.trim();
+    const password = $("#loginPassword").value;
+
+    const { error } = await db.auth.signInWithPassword({
+      email,
+      password
+    });
+
+    if(error){
+      $("#loginError").textContent = error.message;
+      return;
+    }
+
+    location.reload();
+  });
+}
+
 boot();
+authBoot();
