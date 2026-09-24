@@ -313,6 +313,11 @@ async function reports(){
           <textarea id="jobSheetNotes" rows="3" placeholder="Anything else to record..." style="width:100%;padding:11px;border:1px solid #d9e0e7;border-radius:6px;margin-top:6px;resize:vertical"></textarea>
         </div>
 
+        <div style="margin-top:20px">
+  <label class="label">SITE PHOTOS</label>
+  <input id="jobSheetPhotos" type="file" accept="image/*" multiple capture="environment" style="width:100%;padding:11px;border:1px solid #d9e0e7;border-radius:6px;margin-top:6px">
+  <p class="sub" style="margin-top:6px">Add photos showing today's work or site progress.</p> </div>
+
         <div style="display:flex;justify-content:flex-end;margin-top:24px">
           <button id="submitJobSheet" class="primary">Submit job sheet</button>
         </div>
@@ -335,7 +340,7 @@ async function reports(){
       return;
     }
 
-    const { error }=await db
+    const { data: savedSheet, error }=await db
       .from('job_sheets')
       .insert({
         job_id:jobId,
@@ -348,7 +353,7 @@ async function reports(){
         hours_on_site:Number($('#jobSheetHours').value)||0,
         notes:$('#jobSheetNotes').value.trim(),
         status:'submitted'
-      });
+      }).select().single();
 
     if(error){
       toast('Could not submit job sheet');
