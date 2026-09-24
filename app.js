@@ -221,7 +221,145 @@ function jobsView(){header('PROJECT DELIVERY','Jobs & sites');$('#content').inne
 function photos(){header('SITE RECORDS','Site photos');$('#content').innerHTML=`<div class="page"><div class="topline"><div><h3>Site photo log</h3><p class="section-intro">Capture progress, quality and H&S evidence by site.</p></div><button class="secondary" onclick="showModal('Upload site photo')">+ Upload photos</button></div><div class="upload" onclick="showModal('Upload site photo')"><b style="font-size:24px">▣</b><br><b>Drop photos here or browse</b><br><small>JPG, PNG or HEIC · Add a site and description for your record</small></div><div class="card-row" style="margin-top:20px">${['Drainage run complete','Foundation preparation','Compound set-up'].map((x,i)=>`<article class="site-card"><div class="site-image" style="background:linear-gradient(135deg,${['#547c78,#a8c9c0','#717c62,#c3b485','#496985,#99b0bd'][i]})">SITE PHOTO · ${i+1}</div><div><h3>${x}</h3><p>Scorton Meadows · Today, 07:${18+i*9}</p><span class="pill">PROGRESS</span></div></article>`).join('')}</div></div>`}
 function plant(){header('PLANT & FLEET','Plant daily checks & defects');$('#content').innerHTML=`<div class="page"><div class="topline"><div><h3>Fleet status</h3><p class="section-intro">Complete daily checks before plant leaves the yard.</p></div><div><button class="danger" onclick="showModal('Report plant defect')">Report defect</button> <button class="secondary" onclick="showModal('New plant check')">+ Daily check</button></div></div><div class="panel"><table class="table"><thead><tr><th>PLANT</th><th>ASSIGNED TO</th><th>LAST CHECK</th><th>STATUS</th></tr></thead><tbody>${[['JCB 3CX','Sam Brown','Today · 07:16','READY'],['Takeuchi TB216','Connor Bell','Today · 07:04','READY'],['Bomag Roller','Ben Hall','Yesterday · 16:42','CHECK DUE'],['Ifor Williams Trailer','—','Today · 06:55','DEFECT']].map(x=>`<tr><td><b>${x[0]}</b></td><td>${x[1]}</td><td>${x[2]}</td><td><span class="pill ${x[3]==='CHECK DUE'?'amber':x[3]==='DEFECT'?'red':''}">${x[3]}</span></td></tr>`).join('')}</tbody></table></div><div class="grid cols-2" style="margin-top:18px"><div class="panel"><h3>Open defects</h3><div class="notice"><b>Bomag roller — rear light intermittent</b><span>Reported by Ben Hall · Awaiting plant manager review</span></div><div class="notice"><b>Ifor Williams trailer — tyre wear</b><span>Reported today · Remove from service if condition worsens</span></div></div><div class="panel"><h3>Plant manager focus</h3><p class="section-intro">12 of 14 checks completed today.</p><div class="progress"><i style="width:86%"></i></div><p><button class="link" onclick="toast('Plant manager dashboard opened')">Open full plant manager dashboard →</button></p></div></div></div>`}
 function docs(){header('COMPLIANCE LIBRARY','RAMS & documents');$('#content').innerHTML=`<div class="page"><div class="topline"><div><h3>Controlled documents</h3><p class="section-intro">The latest approved RAMS, permits, policies and site packs.</p></div><button class="secondary" onclick="showModal('Upload document')">+ Upload document</button></div><div class="tool-grid">${[['▤','Scorton Meadows RAMS','v3.2 · Approved 14 Sep · Review due Dec'],['▣','Traffic Management Plan','v1.4 · Approved 11 Sep · Current'],['✓','Health & Safety Policy','v2026.1 · Company document · Current'],['⚠','Emergency procedures','v2.0 · Yard and sites · Current'],['◫','COSHH assessments','12 assessments · 2 reviews due'],['⌑','Induction pack','New starter briefing · Current']].map(x=>`<article class="tool-card"><div class="tool-icon">${x[0]}</div><h3>${x[1]}</h3><p>${x[2]}</p><button class="link" onclick="toast('Document opened in a new workspace')">View document →</button></article>`).join('')}</div></div>`}
-function reports(){header('SITE INTELLIGENCE','Daily site reports');$('#content').innerHTML=`<div class="page"><div class="topline"><div><h3>Daily reporting</h3><p class="section-intro">A consistent record of labour, progress, deliveries and issues.</p></div><button class="secondary" onclick="showModal('New daily site report')">+ New report</button></div><div class="grid cols-2"><div class="panel"><h3>Today — Scorton Meadows</h3><div class="list"><div class="row"><span class="row-icon">♙</span><div class="grow"><b>Labour</b><div class="sub">6 operatives · 1 plant operator · 8.5 planned hours</div></div></div><div class="row"><span class="row-icon">▣</span><div class="grow"><b>Progress</b><div class="sub">Drainage run 2 installed and tested. Blinding prep underway.</div></div></div><div class="row"><span class="row-icon">⚠</span><div class="grow"><b>Constraints</b><div class="sub">Afternoon rain forecast — concrete pour remains on schedule.</div></div></div></div><button class="secondary" onclick="toast('Daily report saved')">Complete report</button></div><div class="panel"><h3>Recent reports</h3><div class="list">${['Tue 15 Sep · Scorton Meadows','Mon 14 Sep · The Old Mill','Fri 11 Sep · Scorton Meadows'].map(x=>`<div class="row"><span class="row-icon">▥</span><div class="grow"><b>${x}</b><div class="sub">Submitted and visible to management</div></div><button class="link" onclick="toast('Report opened')">View</button></div>`).join('')}</div></div></div></div>`}
+async function reports(){
+  header('SITE RECORDS','Job sheet');
+
+  const { data:{ user:authUser } } = await db.auth.getUser();
+
+  if(!authUser){
+    $('#content').innerHTML='<div class="page"><div class="panel"><h3>Please sign in again.</h3></div></div>';
+    return;
+  }
+
+  const { data:staff } = await db
+    .from('staff')
+    .select('*')
+    .eq('auth_user_id',authUser.id)
+    .single();
+
+  if(!staff){
+    $('#content').innerHTML='<div class="page"><div class="panel"><h3>Staff record not found.</h3></div></div>';
+    return;
+  }
+
+  const { data:jobList=[] } = await db
+    .from('jobs')
+    .select('id,name')
+    .eq('status','Active')
+    .order('name');
+
+  const today=new Date().toISOString().split('T')[0];
+
+  $('#content').innerHTML=`
+    <div class="page">
+      <div class="topline">
+        <div>
+          <h3>Job sheet</h3>
+          <p class="section-intro">Record the work completed on site today.</p>
+        </div>
+        <span class="pill">DRAFT</span>
+      </div>
+
+      <div class="panel">
+        <div class="grid cols-2">
+
+          <div>
+            <label class="label">JOB / SITE</label>
+            <select id="jobSheetJob" style="width:100%;padding:11px;border:1px solid #d9e0e7;border-radius:6px;margin-top:6px">
+              <option value="">Select job / site</option>
+              ${jobList.map(j=>`<option value="${j.id}">${j.name}</option>`).join('')}
+            </select>
+          </div>
+
+          <div>
+            <label class="label">DATE</label>
+            <input id="jobSheetDate" type="date" value="${today}" style="width:100%;padding:11px;border:1px solid #d9e0e7;border-radius:6px;margin-top:6px">
+          </div>
+
+          <div>
+            <label class="label">EMPLOYEE</label>
+            <input type="text" value="${staff.full_name}" disabled style="width:100%;padding:11px;border:1px solid #d9e0e7;border-radius:6px;margin-top:6px;background:#f5f7f9">
+          </div>
+
+          <div>
+            <label class="label">HOURS ON SITE</label>
+            <input id="jobSheetHours" type="number" min="0" max="24" step="0.5" placeholder="e.g. 8" style="width:100%;padding:11px;border:1px solid #d9e0e7;border-radius:6px;margin-top:6px">
+          </div>
+
+        </div>
+
+        <div style="margin-top:20px">
+          <label class="label">WORK CARRIED OUT</label>
+          <textarea id="jobSheetWork" rows="5" placeholder="Describe the work completed today..." style="width:100%;padding:11px;border:1px solid #d9e0e7;border-radius:6px;margin-top:6px;resize:vertical"></textarea>
+        </div>
+
+        <div style="margin-top:20px">
+          <label class="label">MATERIALS USED</label>
+          <textarea id="jobSheetMaterials" rows="3" placeholder="List materials used today..." style="width:100%;padding:11px;border:1px solid #d9e0e7;border-radius:6px;margin-top:6px;resize:vertical"></textarea>
+        </div>
+
+        <div style="margin-top:20px">
+          <label class="label">PLANT / MACHINERY USED</label>
+          <textarea id="jobSheetPlant" rows="3" placeholder="List plant or machinery used..." style="width:100%;padding:11px;border:1px solid #d9e0e7;border-radius:6px;margin-top:6px;resize:vertical"></textarea>
+        </div>
+
+        <div style="margin-top:20px">
+          <label class="label">PROBLEMS / ISSUES</label>
+          <textarea id="jobSheetIssues" rows="3" placeholder="Any problems, delays or issues?" style="width:100%;padding:11px;border:1px solid #d9e0e7;border-radius:6px;margin-top:6px;resize:vertical"></textarea>
+        </div>
+
+        <div style="margin-top:20px">
+          <label class="label">ADDITIONAL NOTES</label>
+          <textarea id="jobSheetNotes" rows="3" placeholder="Anything else to record..." style="width:100%;padding:11px;border:1px solid #d9e0e7;border-radius:6px;margin-top:6px;resize:vertical"></textarea>
+        </div>
+
+        <div style="display:flex;justify-content:flex-end;margin-top:24px">
+          <button id="submitJobSheet" class="primary">Submit job sheet</button>
+        </div>
+
+      </div>
+    </div>
+  `;
+
+  $('#submitJobSheet').onclick=async()=>{
+    const jobId=$('#jobSheetJob').value;
+    const work=$('#jobSheetWork').value.trim();
+
+    if(!jobId){
+      toast('Please select a job / site');
+      return;
+    }
+
+    if(!work){
+      toast('Please describe the work carried out');
+      return;
+    }
+
+    const { error }=await db
+      .from('job_sheets')
+      .insert({
+        job_id:jobId,
+        staff_id:staff.id,
+        work_date:$('#jobSheetDate').value,
+        work_carried_out:work,
+        materials_used:$('#jobSheetMaterials').value.trim(),
+        plant_used:$('#jobSheetPlant').value.trim(),
+        issues:$('#jobSheetIssues').value.trim(),
+        hours_on_site:Number($('#jobSheetHours').value)||0,
+        notes:$('#jobSheetNotes').value.trim(),
+        status:'submitted'
+      });
+
+    if(error){
+      toast('Could not submit job sheet');
+      return;
+    }
+
+    toast('Job sheet submitted');
+    reports();
+  };
+}
+
 function management(){header('MANAGEMENT OVERVIEW','Company overview');$('#content').innerHTML=`<div class="page"><section class="stats"><div class="stat"><span class="label">LIVE REVENUE</span><strong>£284k</strong><span class="trend">Across 3 active jobs</span></div><div class="stat"><span class="label">LABOUR THIS WEEK</span><strong>216h</strong><span class="trend">88% productive time</span></div><div class="stat"><span class="label">JOB COST VARIANCE</span><strong>+2.4%</strong><span class="trend" style="color:#db8b1a">Monitor Scorton concrete</span></div><div class="stat"><span class="label">PLANT UTILISATION</span><strong>78%</strong><span class="trend">3 assets available</span></div></section><div class="grid cols-2"><div class="panel"><h3>Job costing snapshot</h3><table class="table"><thead><tr><th>JOB</th><th>CONTRACT</th><th>COST TO DATE</th><th>FORECAST</th></tr></thead><tbody>${[['The Old Mill','£126,000','£86,420','On target'],['Scorton Meadows','£98,500','£41,360','+2.4%'],['Riverside Barns','£59,500','£3,200','On target']].map(x=>`<tr><td><b>${x[0]}</b></td><td>${x[1]}</td><td>${x[2]}</td><td><span class="pill ${x[3][0]==='+'?'amber':''}">${x[3]}</span></td></tr>`).join('')}</tbody></table></div><div class="panel"><h3>Company team overview</h3><div class="where">${team.map((x,i)=>`<div class="where-item"><div class="avatar">${initials(x[0])}</div><div><b>${x[0]}</b><div class="sub">${x[1]} · ${x[0]==='Kennedy'?'Office / social content':i<5?'Management':'Operations'}</div></div><span class="pill">${x[0]==='Kennedy'?'OFFICE':i<5?'MANAGEMENT':'TEAM'}</span></div>`).join('')}</div></div></div></div>`}
 function social(){header('MARKETING DESK','Social media content');$('#content').innerHTML=`<div class="page"><div class="topline"><div><h3>Content planner</h3><p class="section-intro">Turn the team’s site progress into professional, on-brand updates.</p></div><button class="secondary" onclick="showModal('Create social post')">+ Create post</button></div><div class="grid cols-2"><div class="panel"><h3>Draft post · Instagram & LinkedIn</h3><p style="line-height:1.7">Another productive week at <b>Scorton Meadows</b>. The team are progressing the drainage installation and preparing the site for the next concrete pour — keeping things moving safely, efficiently and to programme.<br><br><span style="color:var(--blue)">#JamesFordConstruction #Groundworks #CivilEngineering #Yorkshire</span></p><div class="modal-actions"><button class="secondary" onclick="toast('Post saved as draft')">Save draft</button><button class="primary" style="background:var(--blue);color:#fff" onclick="toast('Post queued for approval')">Queue for approval</button></div></div><div class="panel"><h3>Content opportunities</h3><div class="list"><div class="row"><span class="row-icon">▣</span><div class="grow"><b>New site photos available</b><div class="sub">3 photos from Scorton Meadows — ideal for a progress update</div></div><button class="link" onclick="go('photos')">Use</button></div><div class="row"><span class="row-icon">✓</span><div class="grow"><b>Safety milestone</b><div class="sub">96% H&S compliance this month</div></div><button class="link" onclick="toast('Milestone draft created')">Draft</button></div></div></div></div></div>`}
 
