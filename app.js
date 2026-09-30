@@ -450,7 +450,7 @@ for(const file of photoFiles){
 
   if(uploadError){
     console.error(uploadError);
-    continue;
+    toast('Photo upload failed: ' + uploadError.message);
   }
 
   await db.from('job_sheet_photos').insert({
