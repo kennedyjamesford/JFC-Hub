@@ -435,6 +435,32 @@ const { data:submittedSheets=[] } = await db
       return;
     }
 
+    const photoFiles=$('#jobSheetPhotos')?.files || [];
+
+for(const file of photoFiles){
+  const safeName=file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+  const filePath=`${savedSheet.id}/${Date.now()}-${safeName}`;
+
+  const { error:uploadError }=await db.storage
+    .from('job-sheet-photos')
+    .upload(filePath,file,{
+      contentType:file.type,
+      upsert:false
+    });
+
+  if(uploadError){
+    console.error(uploadError);
+    continue;
+  }
+
+  await db.from('job_sheet_photos').insert({
+    job_sheet_id:savedSheet.id,
+    staff_id:staff.id,
+    file_path:filePath,
+    file_name:file.name
+  });
+}
+
     toast('Job sheet submitted');
     setTimeout(()=>reports(),2500);
   };
