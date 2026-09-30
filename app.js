@@ -361,7 +361,7 @@ async function reports(){
     }
 
     toast('Job sheet submitted');
-    reports();
+    setTimeout(()=>reports(),2500);
   };
 }
 
