@@ -221,6 +221,54 @@ function jobsView(){header('PROJECT DELIVERY','Jobs & sites');$('#content').inne
 function photos(){header('SITE RECORDS','Site photos');$('#content').innerHTML=`<div class="page"><div class="topline"><div><h3>Site photo log</h3><p class="section-intro">Capture progress, quality and H&S evidence by site.</p></div><button class="secondary" onclick="showModal('Upload site photo')">+ Upload photos</button></div><div class="upload" onclick="showModal('Upload site photo')"><b style="font-size:24px">▣</b><br><b>Drop photos here or browse</b><br><small>JPG, PNG or HEIC · Add a site and description for your record</small></div><div class="card-row" style="margin-top:20px">${['Drainage run complete','Foundation preparation','Compound set-up'].map((x,i)=>`<article class="site-card"><div class="site-image" style="background:linear-gradient(135deg,${['#547c78,#a8c9c0','#717c62,#c3b485','#496985,#99b0bd'][i]})">SITE PHOTO · ${i+1}</div><div><h3>${x}</h3><p>Scorton Meadows · Today, 07:${18+i*9}</p><span class="pill">PROGRESS</span></div></article>`).join('')}</div></div>`}
 function plant(){header('PLANT & FLEET','Plant daily checks & defects');$('#content').innerHTML=`<div class="page"><div class="topline"><div><h3>Fleet status</h3><p class="section-intro">Complete daily checks before plant leaves the yard.</p></div><div><button class="danger" onclick="showModal('Report plant defect')">Report defect</button> <button class="secondary" onclick="showModal('New plant check')">+ Daily check</button></div></div><div class="panel"><table class="table"><thead><tr><th>PLANT</th><th>ASSIGNED TO</th><th>LAST CHECK</th><th>STATUS</th></tr></thead><tbody>${[['JCB 3CX','Sam Brown','Today · 07:16','READY'],['Takeuchi TB216','Connor Bell','Today · 07:04','READY'],['Bomag Roller','Ben Hall','Yesterday · 16:42','CHECK DUE'],['Ifor Williams Trailer','—','Today · 06:55','DEFECT']].map(x=>`<tr><td><b>${x[0]}</b></td><td>${x[1]}</td><td>${x[2]}</td><td><span class="pill ${x[3]==='CHECK DUE'?'amber':x[3]==='DEFECT'?'red':''}">${x[3]}</span></td></tr>`).join('')}</tbody></table></div><div class="grid cols-2" style="margin-top:18px"><div class="panel"><h3>Open defects</h3><div class="notice"><b>Bomag roller — rear light intermittent</b><span>Reported by Ben Hall · Awaiting plant manager review</span></div><div class="notice"><b>Ifor Williams trailer — tyre wear</b><span>Reported today · Remove from service if condition worsens</span></div></div><div class="panel"><h3>Plant manager focus</h3><p class="section-intro">12 of 14 checks completed today.</p><div class="progress"><i style="width:86%"></i></div><p><button class="link" onclick="toast('Plant manager dashboard opened')">Open full plant manager dashboard →</button></p></div></div></div>`}
 function docs(){header('COMPLIANCE LIBRARY','RAMS & documents');$('#content').innerHTML=`<div class="page"><div class="topline"><div><h3>Controlled documents</h3><p class="section-intro">The latest approved RAMS, permits, policies and site packs.</p></div><button class="secondary" onclick="showModal('Upload document')">+ Upload document</button></div><div class="tool-grid">${[['▤','Scorton Meadows RAMS','v3.2 · Approved 14 Sep · Review due Dec'],['▣','Traffic Management Plan','v1.4 · Approved 11 Sep · Current'],['✓','Health & Safety Policy','v2026.1 · Company document · Current'],['⚠','Emergency procedures','v2.0 · Yard and sites · Current'],['◫','COSHH assessments','12 assessments · 2 reviews due'],['⌑','Induction pack','New starter briefing · Current']].map(x=>`<article class="tool-card"><div class="tool-icon">${x[0]}</div><h3>${x[1]}</h3><p>${x[2]}</p><button class="link" onclick="toast('Document opened in a new workspace')">View document →</button></article>`).join('')}</div></div>`}
+async function viewJobSheet(id){
+  const { data:sheet, error } = await db
+    .from('job_sheets')
+    .select('id,job_id,staff_id,work_date,work_carried_out,materials_used,plant_used,issues,hours_on_site,notes,status')
+    .eq('id',id)
+    .single();
+
+  if(error || !sheet){
+    toast('Could not load job sheet');
+    return;
+  }
+
+  const { data:job } = await db
+    .from('jobs')
+    .select('name')
+    .eq('id',sheet.job_id)
+    .maybeSingle();
+
+  const { data:person } = await db
+    .from('staff')
+    .select('full_name')
+    .eq('id',sheet.staff_id)
+    .maybeSingle();
+
+  header('SITE RECORDS','Job sheet details');
+
+  $('#content').innerHTML=`
+    <div class="page">
+      <div class="topline">
+        <div>
+          <h3>${job?.name || 'Job sheet'}</h3>
+          <p class="section-intro">${sheet.work_date} · ${person?.full_name || 'Employee'}</p>
+        </div>
+        <button class="btn" onclick="reports()">← Back</button>
+      </div>
+
+      <div class="panel">
+        <p><b>Hours on site:</b> ${sheet.hours_on_site || 0}</p>
+        <p><b>Work carried out:</b><br>${sheet.work_carried_out || '—'}</p>
+        <p><b>Materials used:</b><br>${sheet.materials_used || '—'}</p>
+        <p><b>Plant / machinery:</b><br>${sheet.plant_used || '—'}</p>
+        <p><b>Problems / issues:</b><br>${sheet.issues || '—'}</p>
+        <p><b>Additional notes:</b><br>${sheet.notes || '—'}</p>
+      </div>
+    </div>
+  `;
+}
+
 async function reports(){
   header('SITE RECORDS','Job sheet');
 
