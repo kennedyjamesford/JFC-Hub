@@ -283,6 +283,17 @@ if(photos.length){
         <p><b>Plant / machinery:</b><br>${sheet.plant_used || '—'}</p>
         <p><b>Problems / issues:</b><br>${sheet.issues || '—'}</p>
         <p><b>Additional notes:</b><br>${sheet.notes || '—'}</p>
+        ${photoUrls.length ? `
+  <div style="margin-top:20px">
+    <p><b>Site photos:</b></p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-top:10px">
+      ${photoUrls.map(p=>`
+        <img src="${p.signedUrl}" alt="Site photo" style="width:100%;height:180px;object-fit:cover;border-radius:8px">
+      `).join('')}
+    </div>
+  </div>
+` : ''}
+
       </div>
     </div>
   `;
