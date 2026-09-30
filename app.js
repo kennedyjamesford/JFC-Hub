@@ -245,6 +245,25 @@ async function viewJobSheet(id){
     .eq('id',sheet.staff_id)
     .maybeSingle();
 
+  const { data:photos=[] } = await db
+  .from('job_sheet_photos')
+  .select('file_path,file_name')
+  .eq('job_sheet_id',id)
+  .order('created_at');
+
+let photoUrls=[];
+
+if(photos.length){
+  const { data:signed } = await db.storage
+    .from('job-sheet-photos')
+    .createSignedUrls(
+      photos.map(p=>p.file_path),
+      3600
+    );
+
+  photoUrls=signed || [];
+}
+
   header('SITE RECORDS','Job sheet details');
 
   $('#content').innerHTML=`
