@@ -267,7 +267,7 @@ const { data:submittedSheets=[] } = await db
   </div>
 
   ${submittedSheets.length ? submittedSheets.map(sheet=>`
-    <div class="row" style="padding:14px 0;border-top:1px solid #edf0f3">
+    <div class="row" onclick="viewJobSheet('${sheet.id}')" style="padding:14px 0;border-top:1px solid #edf0f3;cursor:pointer">
       <div class="grow">
         <b>${sheet.jobs?.name || 'Job'}</b>
         <div class="sub">${sheet.work_date} · ${sheet.staff?.full_name || 'Employee'} · ${sheet.hours_on_site || 0} hrs</div>
