@@ -249,7 +249,7 @@ async function reports(){
     .order('name');
 const { data:submittedSheets=[] } = await db
   .from('job_sheets')
-  .select('id,work_date,work_carried_out,hours_on_site,status')
+  .select('id,work_date,work_carried_out,materials_used,plant_used,issues,hours_on_site,notes,status')
   .order('work_date',{ascending:false})
   .limit(20);
   const today=new Date().toISOString().split('T')[0];
