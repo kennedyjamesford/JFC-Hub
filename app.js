@@ -247,12 +247,39 @@ async function reports(){
     .select('id,name')
     .eq('status','Active')
     .order('name');
-
+const { data:submittedSheets=[] } = await db
+  .from('job_sheets')
+  .select('id,work_date,work_carried_out,hours_on_site,status,jobs(name),staff(full_name)')
+  .order('work_date',{ascending:false})
+  .limit(20);
   const today=new Date().toISOString().split('T')[0];
 
   $('#content').innerHTML=`
     <div class="page">
-      <div class="topline">
+      
+      <div class="panel" style="margin-bottom:20px">
+  <div class="topline">
+    <div>
+      <h3>Submitted job sheets</h3>
+      <p class="section-intro">Recently completed site records.</p>
+    </div>
+    <span class="pill">${submittedSheets.length}</span>
+  </div>
+
+  ${submittedSheets.length ? submittedSheets.map(sheet=>`
+    <div class="row" style="padding:14px 0;border-top:1px solid #edf0f3">
+      <div class="grow">
+        <b>${sheet.jobs?.name || 'Job'}</b>
+        <div class="sub">${sheet.work_date} · ${sheet.staff?.full_name || 'Employee'} · ${sheet.hours_on_site || 0} hrs</div>
+        <div class="sub" style="margin-top:5px">${sheet.work_carried_out || ''}</div>
+      </div>
+      <span class="pill">${sheet.status}</span>
+    </div>
+  `).join('') : `
+    <p class="sub">No submitted job sheets yet.</p>
+  `}
+</div>
+
         <div>
           <h3>Job sheet</h3>
           <p class="section-intro">Record the work completed on site today.</p>
