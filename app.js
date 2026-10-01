@@ -219,7 +219,455 @@ async function time(){
 
 function jobsView(){header('PROJECT DELIVERY','Jobs & sites');$('#content').innerHTML=`<div class="page"><div class="topline"><div><h3>Live projects</h3><p class="section-intro">Programme, team and document status at a glance.</p></div><button class="secondary" onclick="showModal('Create new job')">+ New job</button></div><div class="card-row">${jobs.map((x,i)=>`<article class="site-card"><div class="site-image">${x[0]}</div><div><h3>${x[0]}</h3><p>⌖ ${x[1]} · Site manager: ${i===0?'Tom Wright':'Connor Bell'}</p><div class="progress"><i style="width:${x[3]}"></i></div><p><b>${x[3]}</b> complete <span class="pill ${x[2]==='Planning'?'amber':''}" style="float:right">${x[2].toUpperCase()}</span></p><button class="link" onclick="toast('Site workspace opened')">Open site workspace →</button></div></article>`).join('')}</div><div class="panel" style="margin-top:20px"><h3>Upcoming activity</h3><div class="list"><div class="row"><span class="row-icon">◷</span><div class="grow"><b>Scorton Meadows concrete pour</b><div class="sub">Today · 10:30 · Crew of 6</div></div><span class="pill amber">TODAY</span></div><div class="row"><span class="row-icon">▤</span><div class="grow"><b>Riverside Barns RAMS briefing</b><div class="sub">Tomorrow · 07:30 · All operatives</div></div><span class="pill">SCHEDULED</span></div></div></div></div>`}
 function photos(){header('SITE RECORDS','Site photos');$('#content').innerHTML=`<div class="page"><div class="topline"><div><h3>Site photo log</h3><p class="section-intro">Capture progress, quality and H&S evidence by site.</p></div><button class="secondary" onclick="showModal('Upload site photo')">+ Upload photos</button></div><div class="upload" onclick="showModal('Upload site photo')"><b style="font-size:24px">▣</b><br><b>Drop photos here or browse</b><br><small>JPG, PNG or HEIC · Add a site and description for your record</small></div><div class="card-row" style="margin-top:20px">${['Drainage run complete','Foundation preparation','Compound set-up'].map((x,i)=>`<article class="site-card"><div class="site-image" style="background:linear-gradient(135deg,${['#547c78,#a8c9c0','#717c62,#c3b485','#496985,#99b0bd'][i]})">SITE PHOTO · ${i+1}</div><div><h3>${x}</h3><p>Scorton Meadows · Today, 07:${18+i*9}</p><span class="pill">PROGRESS</span></div></article>`).join('')}</div></div>`}
-function plant(){header('PLANT & FLEET','Plant daily checks & defects');$('#content').innerHTML=`<div class="page"><div class="topline"><div><h3>Fleet status</h3><p class="section-intro">Complete daily checks before plant leaves the yard.</p></div><div><button class="danger" onclick="showModal('Report plant defect')">Report defect</button> <button class="secondary" onclick="showModal('New plant check')">+ Daily check</button></div></div><div class="panel"><table class="table"><thead><tr><th>PLANT</th><th>ASSIGNED TO</th><th>LAST CHECK</th><th>STATUS</th></tr></thead><tbody>${[['JCB 3CX','Sam Brown','Today · 07:16','READY'],['Takeuchi TB216','Connor Bell','Today · 07:04','READY'],['Bomag Roller','Ben Hall','Yesterday · 16:42','CHECK DUE'],['Ifor Williams Trailer','—','Today · 06:55','DEFECT']].map(x=>`<tr><td><b>${x[0]}</b></td><td>${x[1]}</td><td>${x[2]}</td><td><span class="pill ${x[3]==='CHECK DUE'?'amber':x[3]==='DEFECT'?'red':''}">${x[3]}</span></td></tr>`).join('')}</tbody></table></div><div class="grid cols-2" style="margin-top:18px"><div class="panel"><h3>Open defects</h3><div class="notice"><b>Bomag roller — rear light intermittent</b><span>Reported by Ben Hall · Awaiting plant manager review</span></div><div class="notice"><b>Ifor Williams trailer — tyre wear</b><span>Reported today · Remove from service if condition worsens</span></div></div><div class="panel"><h3>Plant manager focus</h3><p class="section-intro">12 of 14 checks completed today.</p><div class="progress"><i style="width:86%"></i></div><p><button class="link" onclick="toast('Plant manager dashboard opened')">Open full plant manager dashboard →</button></p></div></div></div>`}
+function plant(){
+  header('PLANT & FLEET','Plant checks & defects');
+
+  $('#content').innerHTML=`
+    <div class="page">
+      <div class="topline">
+        <div>
+          <h3>Plant & defects</h3>
+          <p class="section-intro">Digital plant inspections, vehicle checks and defect reporting.</p>
+        </div>
+      </div>
+
+      <div class="grid cols-2" style="margin-top:18px">
+
+        <div class="panel">
+          <div class="panel-head">
+            <h3>🚜 Plant inspection</h3>
+          </div>
+          <p class="sub">Complete the daily and weekly checks for plant and machinery.</p>
+          <button class="primary" style="margin-top:16px"
+            onclick="plantInspection()">Start plant inspection</button>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <h3>🚗 Vehicle check</h3>
+          </div>
+          <p class="sub">Complete the weekly driver vehicle check.</p>
+          <button class="primary" style="margin-top:16px"
+            onclick="vehicleInspection()">Start vehicle check</button>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <h3>⚠️ Report a defect</h3>
+          </div>
+          <p class="sub">Report a fault, damage or safety issue immediately.</p>
+          <button class="danger" style="margin-top:16px"
+            onclick="reportDefect()">Report defect</button>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <h3>📋 Recent checks</h3>
+          </div>
+          <p class="sub">Your completed plant and vehicle checks will appear here.</p>
+        </div>
+
+      </div>
+    </div>`;
+}
+
+async function plantInspection(){
+  const {data:assets=[]}=await db.from('plant_assets')
+    .select('id,plant_number,make_model')
+    .eq('active',true)
+    .order('make_model');
+
+  const daily=[
+    'Engine oil level','Coolant level','Fuel tank top up',
+    'Tyre inflation and condition','Brake performance',
+    'Wheel studs / nuts tight','Engine stop device working',
+    'Security of guards','Seat belt','Hitch / safety pin'
+  ];
+
+  const weekly=[
+    'Oil leaks','Fuel leaks','Coolant leaks',
+    'Any starting difficulties','Clutch operation','Grease all points',
+    'Articulated joint / linkage underneath machine',
+    'Brake fluid level','Brake fluid leaks','Foot brakes / hand brake',
+    'Condition of tracks','Wear / cuts / blemishes',
+    'Condition of steering wheel','Play on steering wheel',
+    'Condition of pins and linkages','Cracks and damage',
+    'Security of guards','Condition of step','Condition of skip / drum',
+    'Condition of glass doors','Security of wiring',
+    'Horn / wiper performance','Green / orange warning light',
+    'Hydraulic oil leaks','Rams and pins condition',
+    'Control lever condition','Hydraulic hoses',
+    'Hydraulic oil level','Any other defects'
+  ];
+
+  const today=new Date().toISOString().split('T')[0];
+
+  header('PLANT & FLEET','Plant inspection');
+
+  $('#content').innerHTML=`
+    <div class="page">
+      <div class="topline">
+        <div>
+          <h3>Plant inspection</h3>
+          <p class="section-intro">Tap ✓ OK, ✕ Defect or — N/A for each check.</p>
+        </div>
+        <button class="secondary" onclick="plant()">← Back</button>
+      </div>
+
+      <div class="panel">
+
+        <div class="grid cols-2">
+          <div>
+            <label class="label">PLANT / MACHINE</label>
+            <select id="plantAsset"
+              style="width:100%;padding:11px;border:1px solid #d9e0e7;border-radius:6px;margin-top:6px">
+              <option value="">Select plant</option>
+              ${assets.map(a=>`
+                <option value="${a.id}">
+                  ${a.plant_number||'No number'} — ${a.make_model}
+                </option>`).join('')}
+            </select>
+          </div>
+
+          <div>
+            <label class="label">DATE</label>
+            <input id="plantCheckDate" type="date" value="${today}"
+              style="width:100%;padding:11px;border:1px solid #d9e0e7;border-radius:6px;margin-top:6px">
+          </div>
+        </div>
+
+        <div style="margin-top:25px">
+          <h3>Daily checks</h3>
+
+          ${daily.map((item,i)=>`
+            <div class="row" style="gap:10px;border-top:1px solid #edf0f3;padding:12px 0">
+              <div class="grow"><b>${item}</b></div>
+              <select class="plantDaily" data-i="${i}"
+                style="width:115px;padding:8px;border:1px solid #d9e0e7;border-radius:6px">
+                <option value="">Choose</option>
+                <option value="ok">✓ OK</option>
+                <option value="defect">✕ Defect</option>
+                <option value="na">— N/A</option>
+              </select>
+            </div>`).join('')}
+        </div>
+
+        <div style="margin-top:25px">
+          <h3>Weekly checks</h3>
+
+          ${weekly.map((item,i)=>`
+            <div class="row" style="gap:10px;border-top:1px solid #edf0f3;padding:12px 0">
+              <div class="grow"><b>${item}</b></div>
+              <select class="plantWeekly" data-i="${i}"
+                style="width:115px;padding:8px;border:1px solid #d9e0e7;border-radius:6px">
+                <option value="">Choose</option>
+                <option value="ok">✓ OK</option>
+                <option value="defect">✕ Defect</option>
+                <option value="na">— N/A</option>
+              </select>
+            </div>`).join('')}
+        </div>
+
+        <div style="margin-top:25px">
+          <label class="quick">
+            <input id="plantSafety" type="checkbox">
+            <b>Safety hazard</b>
+            <small>Could this make the machine unsafe?</small>
+          </label>
+
+          <label class="quick" style="margin-top:10px">
+            <input id="plantRepair" type="checkbox">
+            <b>Immediate repair required</b>
+            <small>Machine should not be used until cleared.</small>
+          </label>
+        </div>
+
+        <div style="margin-top:20px">
+          <label class="label">NOTES / DEFECT DETAILS</label>
+          <textarea id="plantNotes" rows="4"
+            placeholder="Record any defects or observations..."
+            style="width:100%;padding:11px;border:1px solid #d9e0e7;border-radius:6px;margin-top:6px"></textarea>
+        </div>
+
+        <button id="savePlantCheck" class="primary" style="margin-top:22px">
+          Submit inspection
+        </button>
+
+      </div>
+    </div>`;
+
+  $('#savePlantCheck').onclick=async()=>{
+    const plantId=$('#plantAsset').value;
+
+    if(!plantId){
+      toast('Please select the plant / machine');
+      return;
+    }
+
+    const {data:{user:authUser}}=await db.auth.getUser();
+    const {data:person}=await db.from('staff')
+      .select('id')
+      .eq('auth_user_id',authUser.id)
+      .single();
+
+    const dailyResults={};
+    document.querySelectorAll('.plantDaily').forEach((el,i)=>{
+      dailyResults[daily[i]]=el.value;
+    });
+
+    const weeklyResults={};
+    document.querySelectorAll('.plantWeekly').forEach((el,i)=>{
+      weeklyResults[weekly[i]]=el.value;
+    });
+
+    const hasDefect=[
+      ...Object.values(dailyResults),
+      ...Object.values(weeklyResults)
+    ].includes('defect');
+
+    const safety=$('#plantSafety').checked;
+    const repair=$('#plantRepair').checked;
+
+    const {error}=await db.from('plant_checks').insert({
+      plant_id:plantId,
+      staff_id:person.id,
+      check_date:$('#plantCheckDate').value,
+      daily_checks:dailyResults,
+      weekly_checks:weeklyResults,
+      notes:$('#plantNotes').value.trim(),
+      safety_hazard:safety,
+      requires_repair:repair,
+      status:(hasDefect||safety||repair)?'action':'passed'
+    });
+
+    if(error){
+      console.error(error);
+      toast('Could not save inspection');
+      return;
+    }
+
+    toast('Plant inspection submitted');
+    setTimeout(()=>plant(),1000);
+  };
+}
+
+async function vehicleInspection(){
+  header('PLANT & FLEET','Vehicle weekly check');
+
+  $('#content').innerHTML=`
+    <div class="page">
+      <div class="topline">
+        <div>
+          <h3>Vehicle weekly check</h3>
+          <p class="section-intro">Complete the driver vehicle check and defect report.</p>
+        </div>
+        <button class="secondary" onclick="plant()">← Back</button>
+      </div>
+
+      <div class="panel">
+
+        <div class="grid cols-2">
+          <div>
+            <label class="label">VEHICLE REG</label>
+            <input id="vehicleReg" placeholder="e.g. NJ70 HPP"
+              style="width:100%;padding:11px;border:1px solid #d9e0e7;border-radius:6px">
+          </div>
+
+          <div>
+            <label class="label">DRIVER</label>
+            <input id="vehicleDriver"
+              style="width:100%;padding:11px;border:1px solid #d9e0e7;border-radius:6px">
+          </div>
+
+          <div>
+            <label class="label">MILEAGE</label>
+            <input id="vehicleMileage" type="number"
+              style="width:100%;padding:11px;border:1px solid #d9e0e7;border-radius:6px">
+          </div>
+
+          <div>
+            <label class="label">DATE</label>
+            <input id="vehicleDate" type="date"
+              value="${new Date().toISOString().split('T')[0]}"
+              style="width:100%;padding:11px;border:1px solid #d9e0e7;border-radius:6px">
+          </div>
+        </div>
+
+        <div style="margin-top:25px">
+          <h3>Vehicle condition</h3>
+          <p class="sub">Record any issues in the comments below.</p>
+        </div>
+
+        <label class="label" style="display:block;margin-top:20px">
+          DEFECTS / COMMENTS
+        </label>
+
+        <textarea id="vehicleComments" rows="6"
+          placeholder="Describe anything that needs attention..."
+          style="width:100%;padding:11px;border:1px solid #d9e0e7;border-radius:6px;margin-top:6px"></textarea>
+
+        <button id="saveVehicleCheck" class="primary" style="margin-top:22px">
+          Submit vehicle check
+        </button>
+
+      </div>
+    </div>`;
+
+  $('#saveVehicleCheck').onclick=async()=>{
+    const reg=$('#vehicleReg').value.trim();
+
+    if(!reg){
+      toast('Please enter the vehicle registration');
+      return;
+    }
+
+    const {data:{user:authUser}}=await db.auth.getUser();
+
+    const {data:person}=await db.from('staff')
+      .select('id,full_name')
+      .eq('auth_user_id',authUser.id)
+      .single();
+
+    const {error}=await db.from('vehicle_checks').insert({
+      vehicle_reg:reg,
+      driver_name:$('#vehicleDriver').value.trim()||person.full_name,
+      staff_id:person.id,
+      check_date:$('#vehicleDate').value,
+      mileage:Number($('#vehicleMileage').value)||null,
+      checks:{},
+      comments:$('#vehicleComments').value.trim(),
+      status:'passed'
+    });
+
+    if(error){
+      console.error(error);
+      toast('Could not save vehicle check');
+      return;
+    }
+
+    toast('Vehicle check submitted');
+    setTimeout(()=>plant(),1000);
+  };
+}
+
+async function reportDefect(){
+  const {data:assets=[]}=await db.from('plant_assets')
+    .select('id,plant_number,make_model')
+    .eq('active',true)
+    .order('make_model');
+
+  header('PLANT & FLEET','Report a defect');
+
+  $('#content').innerHTML=`
+    <div class="page">
+      <div class="topline">
+        <div>
+          <h3>⚠️ Report a defect</h3>
+          <p class="section-intro">
+            If a defect is a safety issue, stop using the machine and contact a supervisor.
+          </p>
+        </div>
+        <button class="secondary" onclick="plant()">← Back</button>
+      </div>
+
+      <div class="panel">
+
+        <label class="label">PLANT / MACHINE</label>
+
+        <select id="defectPlant"
+          style="width:100%;padding:11px;border:1px solid #d9e0e7;border-radius:6px;margin-top:6px">
+
+          <option value="">Select plant</option>
+
+          ${assets.map(a=>`
+            <option value="${a.id}">
+              ${a.plant_number||'No number'} — ${a.make_model}
+            </option>`).join('')}
+
+        </select>
+
+        <label class="label" style="display:block;margin-top:20px">
+          CATEGORY
+        </label>
+
+        <select id="defectCategory"
+          style="width:100%;padding:11px;border:1px solid #d9e0e7;border-radius:6px;margin-top:6px">
+
+          <option>Engine</option>
+          <option>Brakes</option>
+          <option>Tyres / tracks</option>
+          <option>Steering</option>
+          <option>Hydraulics</option>
+          <option>Electrics</option>
+          <option>Body / glass</option>
+          <option>Safety equipment</option>
+          <option>Other</option>
+
+        </select>
+
+        <label class="label" style="display:block;margin-top:20px">
+          WHAT IS WRONG?
+        </label>
+
+        <textarea id="defectDescription" rows="6"
+          placeholder="Describe the fault..."
+          style="width:100%;padding:11px;border:1px solid #d9e0e7;border-radius:6px;margin-top:6px"></textarea>
+
+        <label class="quick" style="margin-top:20px">
+          <input id="defectSafety" type="checkbox">
+          <b>Safety hazard</b>
+          <small>This could make the machine unsafe.</small>
+        </label>
+
+        <label class="quick" style="margin-top:10px">
+          <input id="defectImmediate" type="checkbox">
+          <b>Remove from use</b>
+          <small>The machine should not be used until repaired.</small>
+        </label>
+
+        <button id="saveDefect" class="danger" style="margin-top:22px">
+          Report defect
+        </button>
+
+      </div>
+    </div>`;
+
+  $('#saveDefect').onclick=async()=>{
+    const description=$('#defectDescription').value.trim();
+
+    if(!description){
+      toast('Please describe the defect');
+      return;
+    }
+
+    const {data:{user:authUser}}=await db.auth.getUser();
+
+    const {data:person}=await db.from('staff')
+      .select('id')
+      .eq('auth_user_id',authUser.id)
+      .single();
+
+    const {error}=await db.from('plant_defects').insert({
+      plant_id:$('#defectPlant').value||null,
+      staff_id:person.id,
+      category:$('#defectCategory').value,
+      description:description,
+      safety_hazard:$('#defectSafety').checked,
+      requires_immediate_repair:$('#defectImmediate').checked,
+      status:'open'
+    });
+
+    if(error){
+      console.error(error);
+      toast('Could not report defect');
+      return;
+    }
+
+    toast('Defect reported');
+    setTimeout(()=>plant(),1000);
+  };
+}
+
 function docs(){header('COMPLIANCE LIBRARY','RAMS & documents');$('#content').innerHTML=`<div class="page"><div class="topline"><div><h3>Controlled documents</h3><p class="section-intro">The latest approved RAMS, permits, policies and site packs.</p></div><button class="secondary" onclick="showModal('Upload document')">+ Upload document</button></div><div class="tool-grid">${[['▤','Scorton Meadows RAMS','v3.2 · Approved 14 Sep · Review due Dec'],['▣','Traffic Management Plan','v1.4 · Approved 11 Sep · Current'],['✓','Health & Safety Policy','v2026.1 · Company document · Current'],['⚠','Emergency procedures','v2.0 · Yard and sites · Current'],['◫','COSHH assessments','12 assessments · 2 reviews due'],['⌑','Induction pack','New starter briefing · Current']].map(x=>`<article class="tool-card"><div class="tool-icon">${x[0]}</div><h3>${x[1]}</h3><p>${x[2]}</p><button class="link" onclick="toast('Document opened in a new workspace')">View document →</button></article>`).join('')}</div></div>`}
 async function viewJobSheet(id){
   const { data:sheet, error } = await db
