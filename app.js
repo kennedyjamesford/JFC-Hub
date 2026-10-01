@@ -327,9 +327,17 @@ async function reports(){
     .order('name');
 const { data:submittedSheets=[] } = await db
   .from('job_sheets')
-  .select('id,work_date,work_carried_out,materials_used,plant_used,issues,hours_on_site,notes,status')
+  .select('id,job_id,staff_id,work_date,work_carried_out,materials_used,plant_used,issues,hours_on_site,notes,status')
   .order('work_date',{ascending:false})
   .limit(20);
+  const { data:allJobs=[] } = await db
+  .from('jobs')
+  .select('id,name');
+
+const { data:allStaff=[] } = await db
+  .from('staff')
+  .select('id,full_name');
+
   const today=new Date().toISOString().split('T')[0];
 
   $('#content').innerHTML=`
@@ -347,8 +355,8 @@ const { data:submittedSheets=[] } = await db
   ${submittedSheets.length ? submittedSheets.map(sheet=>`
     <div class="row" onclick="viewJobSheet('${sheet.id}')" style="padding:14px 0;border-top:1px solid #edf0f3;cursor:pointer">
       <div class="grow">
-        <b>${sheet.jobs?.name || 'Job'}</b>
-        <div class="sub">${sheet.work_date} · ${sheet.staff?.full_name || 'Employee'} · ${sheet.hours_on_site || 0} hrs</div>
+        <b>${allJobs.find(j=>j.id===sheet.job_id)?.name || 'Job'}</b>
+        <div class="sub">${sheet.work_date} · ${allStaff.find(s=>s.id===sheet.staff_id)?.full_name || 'Employee'} · ${sheet.hours_on_site || 0} hrs</div>
         <div class="sub" style="margin-top:5px">${sheet.work_carried_out || ''}</div>
       </div>
       <span class="pill">${sheet.status}</span>
