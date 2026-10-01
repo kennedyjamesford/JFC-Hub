@@ -538,10 +538,38 @@ async function vehicleInspection(){
             </div>`).join('')}
         </div>
 
-        <div style="margin-top:22px">
-          <label class="label">COMMENTS / DEFECTS</label>
-          <textarea id="vehicleComments" rows="5" placeholder="Record any defects, comments or action required..." style="width:100%;padding:11px;border:1px solid #d9e0e7;border-radius:6px;margin-top:6px"></textarea>
-        </div>
+       <div id="vehicleDefectPanel" class="panel" style="display:none;margin-top:22px;border-left:4px solid #d24b4b">
+  <h3>⚠️ Defect reported</h3>
+  <p class="section-intro">Complete the action required for the defect before submitting the check.</p>
+
+  <div id="vehicleDefectList" style="margin-top:12px"></div>
+
+  <div class="grid cols-2" style="margin-top:16px">
+    <label class="quick">
+      <input id="vehicleSafetyHazard" type="checkbox">
+      <b>Safety hazard</b>
+      <small>Could this defect make the vehicle unsafe?</small>
+    </label>
+
+    <label class="quick">
+      <input id="vehicleImmediateRepair" type="checkbox">
+      <b>Immediate repair required</b>
+      <small>Does the vehicle need repair before normal use?</small>
+    </label>
+  </div>
+
+  <label class="quick" style="margin-top:10px">
+    <input id="vehicleRemoveFromUse" type="checkbox">
+    <b>🚫 Remove vehicle from use</b>
+    <small>Vehicle must not be used until a supervisor clears it.</small>
+  </label>
+</div>
+
+<div style="margin-top:22px">
+  <label class="label">COMMENTS / DEFECTS</label>
+  <textarea id="vehicleComments" rows="5" placeholder="Record any defects, comments or action required..." style="width:100%;padding:11px;border:1px solid #d9e0e7;border-radius:6px;margin-top:6px"></textarea>
+</div>
+
 
         <button id="saveVehicleCheck" class="primary" style="margin-top:22px">
           Submit vehicle check
