@@ -452,6 +452,37 @@ async function plantInspection(){
 }
 
 async function vehicleInspection(){
+  const {data:vehicles=[]}=await db.from('vehicle_assets')
+    .select('id,fleet_number,vehicle_name,registration,mot_due,assigned_to')
+    .eq('active',true)
+    .order('fleet_number');
+
+  const checks=[
+    'Lights including brake / reverse',
+    'Engine oil / water / fuel / screenwash levels',
+    'Exhaust condition / smoke / emissions',
+    'Reflectors / markers / warning devices',
+    'Tyres inflation / damage / wear',
+    'Battery security / condition',
+    'Wheels condition / security',
+    'Wheel nut indicators aligned (if fitted)',
+    'Load security',
+    'Mirrors condition / security',
+    'Load door locked / secure',
+    'Body lowered / PTO lock disengaged (if fitted)',
+    'Spray suppression condition',
+    'Body / wings damage and condition',
+    'Windscreen / glass condition',
+    'Driving controls / steering',
+    'Brakes including ABS',
+    'Warning lights',
+    'Speed limiter operation',
+    'Horn / wipers / washers',
+    'Rear view camera operation / visibility'
+  ];
+
+  const today=new Date().toISOString().split('T')[0];
+
   header('PLANT & FLEET','Vehicle weekly check');
 
   $('#content').innerHTML=`
@@ -459,84 +490,103 @@ async function vehicleInspection(){
       <div class="topline">
         <div>
           <h3>Vehicle weekly check</h3>
-          <p class="section-intro">Complete the driver vehicle check and defect report.</p>
+          <p class="section-intro">Complete the weekly vehicle checks.</p>
         </div>
         <button class="secondary" onclick="plant()">← Back</button>
       </div>
 
       <div class="panel">
-
         <div class="grid cols-2">
           <div>
-            <label class="label">VEHICLE REG</label>
-            <input id="vehicleReg" placeholder="e.g. NJ70 HPP"
-              style="width:100%;padding:11px;border:1px solid #d9e0e7;border-radius:6px">
-          </div>
-
-          <div>
-            <label class="label">DRIVER</label>
-            <input id="vehicleDriver"
-              style="width:100%;padding:11px;border:1px solid #d9e0e7;border-radius:6px">
-          </div>
-
-          <div>
-            <label class="label">MILEAGE</label>
-            <input id="vehicleMileage" type="number"
-              style="width:100%;padding:11px;border:1px solid #d9e0e7;border-radius:6px">
+            <label class="label">VEHICLE</label>
+            <select id="vehicleAsset" style="width:100%;padding:11px;border:1px solid #d9e0e7;border-radius:6px;margin-top:6px">
+              <option value="">Select vehicle</option>
+              ${vehicles.map(v=>`
+                <option value="${v.id}">
+                  ${v.fleet_number} — ${v.vehicle_name}${v.registration ? ' — '+v.registration : ''}
+                </option>`).join('')}
+            </select>
           </div>
 
           <div>
             <label class="label">DATE</label>
-            <input id="vehicleDate" type="date"
-              value="${new Date().toISOString().split('T')[0]}"
-              style="width:100%;padding:11px;border:1px solid #d9e0e7;border-radius:6px">
+            <input id="vehicleDate" type="date" value="${today}" style="width:100%;padding:11px;border:1px solid #d9e0e7;border-radius:6px;margin-top:6px">
+          </div>
+
+          <div>
+            <label class="label">DRIVER</label>
+            <input id="vehicleDriver" type="text" placeholder="Driver name" style="width:100%;padding:11px;border:1px solid #d9e0e7;border-radius:6px;margin-top:6px">
+          </div>
+
+          <div>
+            <label class="label">MILEAGE</label>
+            <input id="vehicleMileage" type="number" min="0" placeholder="Current mileage" style="width:100%;padding:11px;border:1px solid #d9e0e7;border-radius:6px;margin-top:6px">
           </div>
         </div>
 
         <div style="margin-top:25px">
-          <h3>Vehicle condition</h3>
-          <p class="sub">Record any issues in the comments below.</p>
+          <h3>Vehicle checks</h3>
+          ${checks.map((item,i)=>`
+            <div class="row" style="gap:10px;border-top:1px solid #edf0f3;padding:12px 0">
+              <div class="grow"><b>${item}</b></div>
+              <select class="vehicleCheck" data-i="${i}" style="width:115px;padding:8px;border:1px solid #d9e0e7;border-radius:6px">
+                <option value="">Choose</option>
+                <option value="ok">✓ OK</option>
+                <option value="defect">✕ Defect</option>
+                <option value="na">— N/A</option>
+              </select>
+            </div>`).join('')}
         </div>
 
-        <label class="label" style="display:block;margin-top:20px">
-          DEFECTS / COMMENTS
-        </label>
-
-        <textarea id="vehicleComments" rows="6"
-          placeholder="Describe anything that needs attention..."
-          style="width:100%;padding:11px;border:1px solid #d9e0e7;border-radius:6px;margin-top:6px"></textarea>
+        <div style="margin-top:22px">
+          <label class="label">COMMENTS / DEFECTS</label>
+          <textarea id="vehicleComments" rows="5" placeholder="Record any defects, comments or action required..." style="width:100%;padding:11px;border:1px solid #d9e0e7;border-radius:6px;margin-top:6px"></textarea>
+        </div>
 
         <button id="saveVehicleCheck" class="primary" style="margin-top:22px">
           Submit vehicle check
         </button>
-
       </div>
     </div>`;
 
   $('#saveVehicleCheck').onclick=async()=>{
-    const reg=$('#vehicleReg').value.trim();
+    const vehicleId=$('#vehicleAsset').value;
 
-    if(!reg){
-      toast('Please enter the vehicle registration');
+    if(!vehicleId){
+      toast('Please select a vehicle');
       return;
     }
 
     const {data:{user:authUser}}=await db.auth.getUser();
 
-    const {data:person}=await db.from('staff')
+    const {data:person,error:personError}=await db.from('staff')
       .select('id,full_name')
       .eq('auth_user_id',authUser.id)
       .single();
 
+    if(personError||!person){
+      toast('Staff record not found');
+      return;
+    }
+
+    const selectedVehicle=vehicles.find(v=>v.id===vehicleId);
+    const results={};
+
+    document.querySelectorAll('.vehicleCheck').forEach((el,i)=>{
+      results[checks[i]]=el.value;
+    });
+
+    const hasDefect=Object.values(results).includes('defect');
+
     const {error}=await db.from('vehicle_checks').insert({
-      vehicle_reg:reg,
+      vehicle_reg:selectedVehicle?.registration||selectedVehicle?.fleet_number||'',
       driver_name:$('#vehicleDriver').value.trim()||person.full_name,
       staff_id:person.id,
       check_date:$('#vehicleDate').value,
       mileage:Number($('#vehicleMileage').value)||null,
-      checks:{},
+      checks:results,
       comments:$('#vehicleComments').value.trim(),
-      status:'passed'
+      status:hasDefect?'defect':'passed'
     });
 
     if(error){
@@ -545,11 +595,41 @@ async function vehicleInspection(){
       return;
     }
 
-    toast('Vehicle check submitted');
+    toast(hasDefect?'Vehicle check submitted with defect':'Vehicle check submitted');
     setTimeout(()=>plant(),1000);
   };
 }
 
+async function farmFleet(){
+  const {data:fleet=[]}=await db.from('farm_assets')
+    .select('fleet_number,vehicle_name,year_or_number')
+    .eq('active',true)
+    .order('fleet_number');
+
+  header('PLANT & FLEET','Farm fleet');
+
+  $('#content').innerHTML=`
+    <div class="page">
+      <div class="topline">
+        <div>
+          <h3>🚜 Farm fleet</h3>
+          <p class="section-intro">JFF farm machinery and equipment.</p>
+        </div>
+        <button class="secondary" onclick="plant()">← Back</button>
+      </div>
+
+      <div class="panel">
+        ${fleet.map(item=>`
+          <div class="row" style="border-top:1px solid #edf0f3;padding:14px 0">
+            <div class="grow">
+              <b>${item.fleet_number} — ${item.vehicle_name}</b>
+              <div class="sub">${item.year_or_number||'Details to be added'}</div>
+            </div>
+            <span class="pill">JFF</span>
+          </div>`).join('')}
+      </div>
+    </div>`;
+}
 async function reportDefect(){
   const {data:assets=[]}=await db.from('plant_assets')
     .select('id,plant_number,make_model')
