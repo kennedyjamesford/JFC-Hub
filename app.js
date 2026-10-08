@@ -217,7 +217,44 @@ async function time(){
   }
 }
 
-function jobsView(){header('PROJECT DELIVERY','Jobs & sites');$('#content').innerHTML=`<div class="page"><div class="topline"><div><h3>Live projects</h3><p class="section-intro">Programme, team and document status at a glance.</p></div><button class="secondary" onclick="showModal('Create new job')">+ New job</button></div><div class="card-row">${jobs.map((x,i)=>`<article class="site-card"><div class="site-image">${x[0]}</div><div><h3>${x[0]}</h3><p>⌖ ${x[1]} · Site manager: ${i===0?'Tom Wright':'Connor Bell'}</p><div class="progress"><i style="width:${x[3]}"></i></div><p><b>${x[3]}</b> complete <span class="pill ${x[2]==='Planning'?'amber':''}" style="float:right">${x[2].toUpperCase()}</span></p><button class="link" onclick="toast('Site workspace opened')">Open site workspace →</button></div></article>`).join('')}</div><div class="panel" style="margin-top:20px"><h3>Upcoming activity</h3><div class="list"><div class="row"><span class="row-icon">◷</span><div class="grow"><b>Scorton Meadows concrete pour</b><div class="sub">Today · 10:30 · Crew of 6</div></div><span class="pill amber">TODAY</span></div><div class="row"><span class="row-icon">▤</span><div class="grow"><b>Riverside Barns RAMS briefing</b><div class="sub">Tomorrow · 07:30 · All operatives</div></div><span class="pill">SCHEDULED</span></div></div></div></div>`}
+async function jobsView(){
+  header('PROJECT DELIVERY','Jobs & sites');
+
+  const {data:jobList=[],error}=await db
+    .from('jobs')
+    .select('id,name,location,status,created_at')
+    .order('name');
+
+  if(error){
+    $('#content').innerHTML='<div class="page"><div class="panel"><h3>Could not load jobs.</h3><p class="sub">Please try again.</p></div></div>';
+    return;
+  }
+
+  $('#content').innerHTML=`
+    <div class="page">
+      <div class="topline">
+        <div>
+          <h3>Live jobs & sites</h3>
+          <p class="section-intro">Jobs currently held in the JFC Hub.</p>
+        </div>
+      </div>
+
+      <div class="card-row">
+        ${jobList.length
+          ? jobList.map(j=>`
+            <article class="site-card">
+              <div class="site-image">${j.name}</div>
+              <div>
+                <h3>${j.name}</h3>
+                <p>⌖ ${j.location||'Location not set'}</p>
+                <span class="pill ${j.status==='Planning'?'amber':''}">${String(j.status||'Active').toUpperCase()}</span>
+              </div>
+            </article>`).join('')
+          : '<div class="panel"><p class="sub">No jobs have been added yet.</p></div>'}
+      </div>
+    </div>`;
+}
+
 function photos(){header('SITE RECORDS','Site photos');$('#content').innerHTML=`<div class="page"><div class="topline"><div><h3>Site photo log</h3><p class="section-intro">Capture progress, quality and H&S evidence by site.</p></div><button class="secondary" onclick="showModal('Upload site photo')">+ Upload photos</button></div><div class="upload" onclick="showModal('Upload site photo')"><b style="font-size:24px">▣</b><br><b>Drop photos here or browse</b><br><small>JPG, PNG or HEIC · Add a site and description for your record</small></div><div class="card-row" style="margin-top:20px">${['Drainage run complete','Foundation preparation','Compound set-up'].map((x,i)=>`<article class="site-card"><div class="site-image" style="background:linear-gradient(135deg,${['#547c78,#a8c9c0','#717c62,#c3b485','#496985,#99b0bd'][i]})">SITE PHOTO · ${i+1}</div><div><h3>${x}</h3><p>Scorton Meadows · Today, 07:${18+i*9}</p><span class="pill">PROGRESS</span></div></article>`).join('')}</div></div>`}
 function plant(){
   header('PLANT & FLEET','Plant checks & defects');
