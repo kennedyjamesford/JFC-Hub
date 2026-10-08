@@ -271,6 +271,7 @@ function plant(){
     </div>`;
 }
 
+
 async function plantInspection(){
   const {data:assets=[]}=await db.from('plant_assets')
     .select('id,plant_number,make_model')
