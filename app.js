@@ -255,7 +255,78 @@ async function jobsView(){
     </div>`;
 }
 
-function photos(){header('SITE RECORDS','Site photos');$('#content').innerHTML=`<div class="page"><div class="topline"><div><h3>Site photo log</h3><p class="section-intro">Capture progress, quality and H&S evidence by site.</p></div><button class="secondary" onclick="showModal('Upload site photo')">+ Upload photos</button></div><div class="upload" onclick="showModal('Upload site photo')"><b style="font-size:24px">▣</b><br><b>Drop photos here or browse</b><br><small>JPG, PNG or HEIC · Add a site and description for your record</small></div><div class="card-row" style="margin-top:20px">${['Drainage run complete','Foundation preparation','Compound set-up'].map((x,i)=>`<article class="site-card"><div class="site-image" style="background:linear-gradient(135deg,${['#547c78,#a8c9c0','#717c62,#c3b485','#496985,#99b0bd'][i]})">SITE PHOTO · ${i+1}</div><div><h3>${x}</h3><p>Scorton Meadows · Today, 07:${18+i*9}</p><span class="pill">PROGRESS</span></div></article>`).join('')}</div></div>`}
+async function photos(){
+  header('SITE RECORDS','Site photos');
+
+  const {data:photoList=[],error}=await db
+    .from('job_sheet_photos')
+    .select('id,job_sheet_id,file_name,file_path,created_at,staff_id')
+    .order('created_at',{ascending:false})
+    .limit(30);
+
+  if(error){
+    $('#content').innerHTML='<div class="page"><div class="panel"><h3>Could not load site photos.</h3><p class="sub">Please try again.</p></div></div>';
+    return;
+  }
+
+  const {data:staff=[]}=await db.from('staff').select('id,full_name');
+  const {data:jobs=[]}=await db.from('jobs').select('id,name');
+
+  const cards=[];
+
+  for(const p of photoList){
+    const {data:signed}=await db.storage
+      .from('job-sheet-photos')
+      .createSignedUrl(p.file_path,3600);
+
+    const {data:sheet}=await db
+      .from('job_sheets')
+      .select('job_id,work_date')
+      .eq('id',p.job_sheet_id)
+      .maybeSingle();
+
+    cards.push({
+      p,
+      url:signed?.signedUrl,
+      sheet,
+      person:staff.find(s=>s.id===p.staff_id),
+      job:jobs.find(j=>j.id===sheet?.job_id)
+    });
+  }
+
+  $('#content').innerHTML=`
+    <div class="page">
+      <div class="topline">
+        <div>
+          <h3>Site photo log</h3>
+          <p class="section-intro">Photos uploaded through submitted job sheets.</p>
+        </div>
+      </div>
+
+      ${
+        cards.length
+        ? `<div class="card-row">
+            ${cards.map(x=>`
+              <article class="site-card">
+                <div class="site-image" style="padding:0;overflow:hidden">
+                  ${
+                    x.url
+                    ? `<img src="${x.url}" alt="Site photo" style="width:100%;height:180px;object-fit:cover">`
+                    : 'PHOTO'
+                  }
+                </div>
+                <div>
+                  <h3>${x.job?.name||'Job site'}</h3>
+                  <p>${x.sheet?.work_date||''} · ${x.person?.full_name||'Employee'}</p>
+                  <small>${x.p.file_name}</small>
+                </div>
+              </article>
+            `).join('')}
+          </div>`
+        : '<div class="panel"><p class="sub">No site photos have been uploaded yet.</p></div>'
+      }
+    </div>`;
+}
 function plant(){
   header('PLANT & FLEET','Plant checks & defects');
 
