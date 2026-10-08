@@ -1045,6 +1045,410 @@ if(photos.length){
 }
 
 async function reports(){
+  header('SITE RECORDS','Daily reports');
+
+  const {data:{user:authUser}}=await db.auth.getUser();
+
+  if(!authUser){
+    $('#content').innerHTML='<div class="page"><div class="panel"><h3>Please sign in again.</h3></div></div>';
+    return;
+  }
+
+  const {data:staff}=await db
+    .from('staff')
+    .select('*')
+    .eq('auth_user_id',authUser.id)
+    .single();
+
+  if(!staff){
+    $('#content').innerHTML='<div class="page"><div class="panel"><h3>Staff record not found.</h3></div></div>';
+    return;
+  }
+
+  const {data:jobList=[]}=await db
+    .from('jobs')
+    .select('id,name')
+    .eq('status','Active')
+    .order('name');
+
+  const {data:submittedSheets=[]}=await db
+    .from('job_sheets')
+    .select('id,job_id,staff_id,work_date,work_carried_out,materials_used,plant_used,issues,hours_on_site,notes,status')
+    .order('work_date',{ascending:false})
+    .limit(50);
+
+  const {data:allJobs=[]}=await db
+    .from('jobs')
+    .select('id,name');
+
+  const {data:allStaff=[]}=await db
+    .from('staff')
+    .select('id,full_name');
+
+  const today=new Date();
+  const todayString=
+    today.getFullYear()+'-'+
+    String(today.getMonth()+1).padStart(2,'0')+'-'+
+    String(today.getDate()).padStart(2,'0');
+
+  const todaySheets=submittedSheets.filter(s=>s.work_date===todayString);
+
+  const todayHours=todaySheets.reduce(
+    (total,s)=>total+(Number(s.hours_on_site)||0),0
+  );
+
+  const todaySites=new Set(
+    todaySheets.map(s=>s.job_id)
+  ).size;
+
+  $('#content').innerHTML=`
+    <div class="page">
+
+      <div class="topline">
+        <div>
+          <h3>Daily reports</h3>
+          <p class="section-intro">
+            Live site reports submitted through the JFC Hub.
+          </p>
+        </div>
+      </div>
+
+      <section class="stats">
+
+        <div class="stat">
+          <span class="label">TODAY'S REPORTS</span>
+          <strong>${todaySheets.length}</strong>
+          <span class="trend">Submitted today</span>
+        </div>
+
+        <div class="stat">
+          <span class="label">HOURS TODAY</span>
+          <strong>${todayHours}</strong>
+          <span class="trend">Hours recorded</span>
+        </div>
+
+        <div class="stat">
+          <span class="label">SITES REPORTED</span>
+          <strong>${todaySites}</strong>
+          <span class="trend">Active sites today</span>
+        </div>
+
+        <div class="stat">
+          <span class="label">TOTAL REPORTS</span>
+          <strong>${submittedSheets.length}</strong>
+          <span class="trend">Recent Hub records</span>
+        </div>
+
+      </section>
+
+      <div class="panel" style="margin-bottom:20px">
+
+        <div class="topline">
+          <div>
+            <h3>Recent submitted reports</h3>
+            <p class="section-intro">
+              Click a report to view the full site record.
+            </p>
+          </div>
+
+          <span class="pill">${submittedSheets.length}</span>
+        </div>
+
+        ${
+          submittedSheets.length
+          ?
+          submittedSheets.map(sheet=>`
+
+            <div
+              class="row"
+              onclick="viewJobSheet('${sheet.id}')"
+              style="padding:14px 0;border-top:1px solid #edf0f3;cursor:pointer"
+            >
+
+              <div class="grow">
+
+                <b>
+                  ${
+                    allJobs.find(j=>j.id===sheet.job_id)?.name
+                    || 'Job'
+                  }
+                </b>
+
+                <div class="sub">
+                  ${sheet.work_date}
+                  ·
+                  ${
+                    allStaff.find(s=>s.id===sheet.staff_id)?.full_name
+                    || 'Employee'
+                  }
+                  ·
+                  ${sheet.hours_on_site||0} hrs
+                </div>
+
+                <div class="sub" style="margin-top:5px">
+                  ${sheet.work_carried_out||''}
+                </div>
+
+              </div>
+
+              <span class="pill">
+                ${String(sheet.status||'submitted').toUpperCase()}
+              </span>
+
+            </div>
+
+          `).join('')
+
+          :
+
+          `<p class="sub">No submitted job reports yet.</p>`
+        }
+
+      </div>
+
+      <div class="topline">
+
+        <div>
+          <h3>New daily report</h3>
+          <p class="section-intro">
+            Record the work completed on site today.
+          </p>
+        </div>
+
+        <span class="pill">DRAFT</span>
+
+      </div>
+
+      <div class="panel">
+
+        <div class="grid cols-2">
+
+          <div>
+            <label class="label">JOB / SITE</label>
+
+            <select
+              id="jobSheetJob"
+              style="width:100%;padding:11px;border:1px solid #d9e0e7;border-radius:6px;margin-top:6px"
+            >
+
+              <option value="">Select job / site</option>
+
+              ${
+                jobList.map(j=>
+                  `<option value="${j.id}">${j.name}</option>`
+                ).join('')
+              }
+
+            </select>
+          </div>
+
+          <div>
+            <label class="label">DATE</label>
+
+            <input
+              id="jobSheetDate"
+              type="date"
+              value="${todayString}"
+              style="width:100%;padding:11px;border:1px solid #d9e0e7;border-radius:6px;margin-top:6px"
+            >
+          </div>
+
+          <div>
+            <label class="label">EMPLOYEE</label>
+
+            <input
+              type="text"
+              value="${staff.full_name}"
+              disabled
+              style="width:100%;padding:11px;border:1px solid #d9e0e7;border-radius:6px;margin-top:6px;background:#f5f7f9"
+            >
+          </div>
+
+          <div>
+            <label class="label">HOURS ON SITE</label>
+
+            <input
+              id="jobSheetHours"
+              type="number"
+              min="0"
+              max="24"
+              step="0.5"
+              placeholder="e.g. 8"
+              style="width:100%;padding:11px;border:1px solid #d9e0e7;border-radius:6px;margin-top:6px"
+            >
+          </div>
+
+        </div>
+
+        <div style="margin-top:20px">
+          <label class="label">WORK CARRIED OUT</label>
+
+          <textarea
+            id="jobSheetWork"
+            rows="5"
+            placeholder="Describe the work completed today..."
+            style="width:100%;padding:11px;border:1px solid #d9e0e7;border-radius:6px;margin-top:6px;resize:vertical"
+          ></textarea>
+        </div>
+
+        <div style="margin-top:20px">
+          <label class="label">MATERIALS USED</label>
+
+          <textarea
+            id="jobSheetMaterials"
+            rows="3"
+            placeholder="List materials used today..."
+            style="width:100%;padding:11px;border:1px solid #d9e0e7;border-radius:6px;margin-top:6px;resize:vertical"
+          ></textarea>
+        </div>
+
+        <div style="margin-top:20px">
+          <label class="label">PLANT / MACHINERY USED</label>
+
+          <textarea
+            id="jobSheetPlant"
+            rows="3"
+            placeholder="List plant or machinery used..."
+            style="width:100%;padding:11px;border:1px solid #d9e0e7;border-radius:6px;margin-top:6px;resize:vertical"
+          ></textarea>
+        </div>
+
+        <div style="margin-top:20px">
+          <label class="label">PROBLEMS / ISSUES</label>
+
+          <textarea
+            id="jobSheetIssues"
+            rows="3"
+            placeholder="Any problems, delays or issues?"
+            style="width:100%;padding:11px;border:1px solid #d9e0e7;border-radius:6px;margin-top:6px;resize:vertical"
+          ></textarea>
+        </div>
+
+        <div style="margin-top:20px">
+          <label class="label">ADDITIONAL NOTES</label>
+
+          <textarea
+            id="jobSheetNotes"
+            rows="3"
+            placeholder="Anything else to record..."
+            style="width:100%;padding:11px;border:1px solid #d9e0e7;border-radius:6px;margin-top:6px;resize:vertical"
+          ></textarea>
+        </div>
+
+        <div style="margin-top:20px">
+
+          <label class="label">SITE PHOTOS</label>
+
+          <input
+            id="jobSheetPhotos"
+            type="file"
+            accept="image/*"
+            multiple
+            capture="environment"
+            style="width:100%;padding:11px;border:1px solid #d9e0e7;border-radius:6px;margin-top:6px"
+          >
+
+          <p class="sub" style="margin-top:6px">
+            Add photos showing today's work or site progress.
+          </p>
+
+        </div>
+
+        <div style="display:flex;justify-content:flex-end;margin-top:24px">
+
+          <button id="submitJobSheet" class="primary">
+            Submit daily report
+          </button>
+
+        </div>
+
+      </div>
+
+    </div>
+  `;
+
+  $('#submitJobSheet').onclick=async()=>{
+
+    const jobId=$('#jobSheetJob').value;
+    const work=$('#jobSheetWork').value.trim();
+
+    if(!jobId){
+      toast('Please select a job / site');
+      return;
+    }
+
+    if(!work){
+      toast('Please describe the work carried out');
+      return;
+    }
+
+    const {data:savedSheet,error}=await db
+      .from('job_sheets')
+      .insert({
+        job_id:jobId,
+        staff_id:staff.id,
+        work_date:$('#jobSheetDate').value,
+        work_carried_out:work,
+        materials_used:$('#jobSheetMaterials').value.trim(),
+        plant_used:$('#jobSheetPlant').value.trim(),
+        issues:$('#jobSheetIssues').value.trim(),
+        hours_on_site:Number($('#jobSheetHours').value)||0,
+        notes:$('#jobSheetNotes').value.trim(),
+        status:'submitted'
+      })
+      .select()
+      .single();
+
+    if(error){
+      console.error(error);
+      toast('Could not submit daily report');
+      return;
+    }
+
+    const photoFiles=$('#jobSheetPhotos')?.files||[];
+
+    for(const file of photoFiles){
+
+      const safeName=file.name.replace(
+        /[^a-zA-Z0-9._-]/g,
+        '_'
+      );
+
+      const filePath=
+        `${savedSheet.id}/${Date.now()}-${safeName}`;
+
+      const {error:uploadError}=await db.storage
+        .from('job-sheet-photos')
+        .upload(
+          filePath,
+          file,
+          {
+            contentType:file.type,
+            upsert:false
+          }
+        );
+
+      if(uploadError){
+        console.error(uploadError);
+        toast('Photo upload failed: '+uploadError.message);
+      }
+
+      await db
+        .from('job_sheet_photos')
+        .insert({
+          job_sheet_id:savedSheet.id,
+          staff_id:staff.id,
+          file_path:filePath,
+          file_name:file.name
+        });
+    }
+
+    toast('Daily report submitted');
+
+    setTimeout(()=>reports(),1500);
+  };
+}
+
   header('SITE RECORDS','Job sheet');
 
   const { data:{ user:authUser } } = await db.auth.getUser();
