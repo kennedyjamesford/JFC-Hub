@@ -234,45 +234,74 @@ function plant(){
       <div class="grid cols-2" style="margin-top:18px">
 
         <div class="panel">
-          <div class="panel-head">
-            <h3>🚜 Plant inspection</h3>
-          </div>
+          <div class="panel-head"><h3>🚜 Plant inspection</h3></div>
           <p class="sub">Complete the daily and weekly checks for plant and machinery.</p>
-          <button class="primary" style="margin-top:16px"
-            onclick="plantInspection()">Start plant inspection</button>
+          <button class="primary" style="margin-top:16px" onclick="plantInspection()">Start plant inspection</button>
         </div>
 
         <div class="panel">
-          <div class="panel-head">
-            <h3>🚗 Vehicle check</h3>
-          </div>
+          <div class="panel-head"><h3>🚗 Vehicle check</h3></div>
           <p class="sub">Complete the weekly driver vehicle check.</p>
-          <button class="primary" style="margin-top:16px"
-            onclick="vehicleInspection()">Start vehicle check</button>
+          <button class="primary" style="margin-top:16px" onclick="vehicleInspection()">Start vehicle check</button>
         </div>
 
         <div class="panel">
-          <div class="panel-head">
-            <h3>⚠️ Report a defect</h3>
-          </div>
+          <div class="panel-head"><h3>⚠️ Report a defect</h3></div>
           <p class="sub">Report a fault, damage or safety issue immediately.</p>
-          <button class="danger" style="margin-top:16px"
-            onclick="reportDefect()">Report defect</button>
+          <button class="danger" style="margin-top:16px" onclick="reportDefect()">Report defect</button>
         </div>
 
         <div class="panel">
-          <div class="panel-head">
-            <h3>📋 Recent checks</h3>
-          </div>
-          <p class="sub">Your completed plant and vehicle checks will appear here.</p>
+          <div class="panel-head"><h3>📋 Recent checks</h3></div>
+          <div id="recentPlantChecks"><p class="sub">Loading recent checks...</p></div>
         </div>
 
       </div>
     </div>`;
+
+  (async()=>{
+    const [
+      {data:plants=[]},
+      {data:plantChecks=[]},
+      {data:vehicleChecks=[]},
+      {data:defects=[]}
+    ]=await Promise.all([
+      db.from('plant_assets').select('id,plant_number,make_model'),
+      db.from('plant_checks').select('id,plant_id,check_date,status,created_at').order('created_at',{ascending:false}).limit(5),
+      db.from('vehicle_checks').select('id,vehicle_reg,check_date,status,created_at').order('created_at',{ascending:false}).limit(5),
+      db.from('plant_defects').select('id,vehicle_reg,category,description,status,reported_at').order('reported_at',{ascending:false}).limit(5)
+    ]);
+
+    const recent=[
+      ...plantChecks.map(x=>({
+        date:x.created_at||x.check_date,
+        title:`🚜 ${plants.find(p=>p.id===x.plant_id)?.plant_number||'Plant check'}`,
+        status:x.status
+      })),
+      ...vehicleChecks.map(x=>({
+        date:x.created_at||x.check_date,
+        title:`🚗 ${x.vehicle_reg||'Vehicle check'}`,
+        status:x.status
+      })),
+      ...defects.map(x=>({
+        date:x.reported_at,
+        title:`⚠️ Defect — ${x.vehicle_reg||x.category||'Plant'}`,
+        status:x.status
+      }))
+    ].sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,8);
+
+    $('#recentPlantChecks').innerHTML=recent.length
+      ? recent.map(x=>`
+        <div class="row" style="border-top:1px solid #edf0f3;padding:12px 0">
+          <div class="grow">
+            <b>${x.title}</b>
+            <div class="sub">${new Date(x.date).toLocaleDateString('en-GB')}</div>
+          </div>
+          <span class="pill">${String(x.status||'submitted').toUpperCase()}</span>
+        </div>`).join('')
+      : '<p class="sub">No recent checks yet.</p>';
+  })();
 }
-
-
-async function plantInspection(){
   const {data:assets=[]}=await db.from('plant_assets')
     .select('id,plant_number,make_model')
     .eq('active',true)
