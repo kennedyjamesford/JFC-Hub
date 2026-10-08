@@ -1470,12 +1470,24 @@ async function management(){
     db.from('timesheet_entries').select('id,hours,work_date').limit(500)
   ]);
 
-  const today=new Date().toISOString().slice(0,10);
+  const now=new Date();
+  const today=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
+
   const todayReports=reports.filter(r=>r.work_date===today);
   const todayHours=todayReports.reduce((n,r)=>n+(Number(r.hours_on_site)||0),0);
   const timesheetHours=timesheets.reduce((n,r)=>n+(Number(r.hours)||0),0);
-  const openDefects=defects.filter(d=>d.status==='open').length;
+
+  const openDefects=defects.filter(d=>d.status==='open');
   const passedChecks=checks.filter(c=>c.status==='passed').length;
+
+  const reportedJobIds=new Set(todayReports.map(r=>r.job_id));
+
+  const jobsNeedingReports=jobs.filter(j=>{
+    const status=String(j.status||'').toLowerCase();
+    return !reportedJobIds.has(j.id) && status!=='completed' && status!=='complete';
+  });
+
+  const attentionCount=jobsNeedingReports.length+openDefects.length;
 
   const jobName=id=>{
     const j=jobs.find(x=>x.id===id);
@@ -1500,6 +1512,12 @@ async function management(){
       <section class="stats">
 
         <div class="stat">
+          <span class="label">NEEDS ATTENTION</span>
+          <strong>${attentionCount}</strong>
+          <span class="trend">Reports & defects</span>
+        </div>
+
+        <div class="stat">
           <span class="label">ACTIVE STAFF</span>
           <strong>${staff.length}</strong>
           <span class="trend">Live staff records</span>
@@ -1517,13 +1535,79 @@ async function management(){
           <span class="trend">${todayHours} hours recorded</span>
         </div>
 
-        <div class="stat">
-          <span class="label">OPEN DEFECTS</span>
-          <strong>${openDefects}</strong>
-          <span class="trend">Plant & fleet</span>
+      </section>
+
+      <div class="grid cols-2">
+
+        <div class="panel">
+          <h3>Needs attention</h3>
+
+          <div class="list">
+
+            ${
+              jobsNeedingReports.length
+              ? jobsNeedingReports.slice(0,8).map(j=>`
+                <div class="row">
+                  <div class="grow">
+                    <b>${j.name}</b>
+                    <div class="sub">No daily report recorded today</div>
+                  </div>
+                  <span class="pill">REPORT DUE</span>
+                </div>
+              `).join('')
+              : '<p class="sub">All active jobs have a report today.</p>'
+            }
+
+            ${
+              openDefects.length
+              ? openDefects.slice(0,8).map(d=>`
+                <div class="row">
+                  <div class="grow">
+                    <b>${d.category||'Defect'}</b>
+                    <div class="sub">${d.description||'No description'}</div>
+                  </div>
+                  <span class="pill">OPEN</span>
+                </div>
+              `).join('')
+              : '<p class="sub">No open plant or fleet defects.</p>'
+            }
+
+          </div>
         </div>
 
-      </section>
+        <div class="panel">
+          <h3>Today's reporting</h3>
+
+          <div class="list">
+
+            <div class="row">
+              <div class="grow">
+                <b>Daily reports</b>
+                <div class="sub">Reports submitted today</div>
+              </div>
+              <strong>${todayReports.length}</strong>
+            </div>
+
+            <div class="row">
+              <div class="grow">
+                <b>Hours reported</b>
+                <div class="sub">Hours recorded on daily reports</div>
+              </div>
+              <strong>${todayHours}</strong>
+            </div>
+
+            <div class="row">
+              <div class="grow">
+                <b>Jobs still needing a report</b>
+                <div class="sub">Active jobs with no report today</div>
+              </div>
+              <strong>${jobsNeedingReports.length}</strong>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
 
       <div class="grid cols-2">
 
@@ -1550,22 +1634,26 @@ async function management(){
         </div>
 
         <div class="panel">
-          <h3>Open defects</h3>
+          <h3>Plant & fleet</h3>
 
           <div class="list">
-            ${
-              defects.filter(d=>d.status==='open').length
-              ? defects.filter(d=>d.status==='open').slice(0,6).map(d=>`
-                <div class="row">
-                  <div class="grow">
-                    <b>${d.category||'Defect'}</b>
-                    <div class="sub">${d.description||'No description'}</div>
-                  </div>
-                  <span class="pill">OPEN</span>
-                </div>
-              `).join('')
-              : '<p class="sub">No open defects.</p>'
-            }
+
+            <div class="row">
+              <div class="grow">
+                <b>Open defects</b>
+                <div class="sub">Plant & fleet</div>
+              </div>
+              <strong>${openDefects.length}</strong>
+            </div>
+
+            <div class="row">
+              <div class="grow">
+                <b>Passed checks</b>
+                <div class="sub">Recorded plant checks</div>
+              </div>
+              <strong>${passedChecks}</strong>
+            </div>
+
           </div>
         </div>
 
@@ -1607,14 +1695,6 @@ async function management(){
 
             <div class="row">
               <div class="grow">
-                <b>Passed plant checks</b>
-                <div class="sub">Recorded checks</div>
-              </div>
-              <strong>${passedChecks}</strong>
-            </div>
-
-            <div class="row">
-              <div class="grow">
                 <b>Total daily reports</b>
                 <div class="sub">All submitted reports</div>
               </div>
@@ -1626,7 +1706,7 @@ async function management(){
                 <b>Open defects</b>
                 <div class="sub">Plant & fleet</div>
               </div>
-              <strong>${openDefects}</strong>
+              <strong>${openDefects.length}</strong>
             </div>
 
           </div>
