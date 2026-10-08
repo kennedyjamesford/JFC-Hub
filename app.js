@@ -302,7 +302,8 @@ function plant(){
       : '<p class="sub">No recent checks yet.</p>';
   })();
 }
-  const {data:assets=[]}=await db.from('plant_assets')
+  async function plantInspection(){
+const {data:assets=[]}=await db.from('plant_assets')
     .select('id,plant_number,make_model')
     .eq('active',true)
     .order('make_model');
