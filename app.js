@@ -1450,26 +1450,52 @@ async function reports(){
 }
 
 
+
 async function management(){
-  header('MANAGEMENT OVERVIEW','Company overview');
+  header('JFC CONTROL CENTRE','Live company overview');
 
   const [
     {data:staff=[]},
     {data:jobs=[]},
     {data:checks=[]},
-    {data:defects=[]}
+    {data:defects=[]},
+    {data:reports=[]},
+    {data:timesheets=[]}
   ] = await Promise.all([
-    db.from('staff').select('full_name,job_title,role,active').eq('active',true).order('full_name'),
-    db.from('jobs').select('name,status').order('name'),
+    db.from('staff').select('id,full_name,job_title,role,active').eq('active',true).order('full_name'),
+    db.from('jobs').select('id,name,status,location').order('name'),
     db.from('plant_checks').select('id,status,created_at').order('created_at',{ascending:false}).limit(100),
-    db.from('plant_defects').select('id,status,reported_at').order('reported_at',{ascending:false}).limit(100)
+    db.from('plant_defects').select('id,status,reported_at,category,description').order('reported_at',{ascending:false}).limit(100),
+    db.from('job_sheets').select('id,job_id,staff_id,work_date,hours_on_site,status').order('work_date',{ascending:false}).limit(100),
+    db.from('timesheet_entries').select('id,hours,work_date').limit(500)
   ]);
 
+  const today=new Date().toISOString().slice(0,10);
+  const todayReports=reports.filter(r=>r.work_date===today);
+  const todayHours=todayReports.reduce((n,r)=>n+(Number(r.hours_on_site)||0),0);
+  const timesheetHours=timesheets.reduce((n,r)=>n+(Number(r.hours)||0),0);
   const openDefects=defects.filter(d=>d.status==='open').length;
   const passedChecks=checks.filter(c=>c.status==='passed').length;
 
+  const jobName=id=>{
+    const j=jobs.find(x=>x.id===id);
+    return j ? j.name : 'Unknown job';
+  };
+
+  const staffName=id=>{
+    const s=staff.find(x=>x.id===id);
+    return s ? s.full_name : 'Unknown';
+  };
+
   $('#content').innerHTML=`
     <div class="page">
+
+      <div class="topline">
+        <div>
+          <h3>JFC control centre</h3>
+          <p class="section-intro">Live overview of people, jobs, reports, plant and activity.</p>
+        </div>
+      </div>
 
       <section class="stats">
 
@@ -1486,15 +1512,15 @@ async function management(){
         </div>
 
         <div class="stat">
-          <span class="label">OPEN DEFECTS</span>
-          <strong>${openDefects}</strong>
-          <span class="trend">Plant & fleet</span>
+          <span class="label">REPORTS TODAY</span>
+          <strong>${todayReports.length}</strong>
+          <span class="trend">${todayHours} hours recorded</span>
         </div>
 
         <div class="stat">
-          <span class="label">PASSED CHECKS</span>
-          <strong>${passedChecks}</strong>
-          <span class="trend">Recorded in the Hub</span>
+          <span class="label">OPEN DEFECTS</span>
+          <strong>${openDefects}</strong>
+          <span class="trend">Plant & fleet</span>
         </div>
 
       </section>
@@ -1502,23 +1528,50 @@ async function management(){
       <div class="grid cols-2">
 
         <div class="panel">
-          <h3>Live jobs</h3>
+          <h3>Recent daily reports</h3>
 
           <div class="list">
             ${
-              jobs.length
-              ? jobs.map(j=>`
-                <div class="row">
+              reports.length
+              ? reports.slice(0,6).map(r=>`
+                <div class="row" onclick="viewJobSheet('${r.id}')" style="cursor:pointer">
                   <div class="grow">
-                    <b>${j.name}</b>
+                    <b>${jobName(r.job_id)}</b>
+                    <div class="sub">
+                      ${staffName(r.staff_id)} · ${r.work_date} · ${Number(r.hours_on_site)||0} hrs
+                    </div>
                   </div>
-                  <span class="pill">${String(j.status||'ACTIVE').toUpperCase()}</span>
+                  <span class="pill">${String(r.status||'SUBMITTED').toUpperCase()}</span>
                 </div>
               `).join('')
-              : '<p class="sub">No jobs have been added yet.</p>'
+              : '<p class="sub">No daily reports have been submitted yet.</p>'
             }
           </div>
         </div>
+
+        <div class="panel">
+          <h3>Open defects</h3>
+
+          <div class="list">
+            ${
+              defects.filter(d=>d.status==='open').length
+              ? defects.filter(d=>d.status==='open').slice(0,6).map(d=>`
+                <div class="row">
+                  <div class="grow">
+                    <b>${d.category||'Defect'}</b>
+                    <div class="sub">${d.description||'No description'}</div>
+                  </div>
+                  <span class="pill">OPEN</span>
+                </div>
+              `).join('')
+              : '<p class="sub">No open defects.</p>'
+            }
+          </div>
+        </div>
+
+      </div>
+
+      <div class="grid cols-2">
 
         <div class="panel">
           <h3>Company team</h3>
@@ -1539,7 +1592,68 @@ async function management(){
           </div>
         </div>
 
+        <div class="panel">
+          <h3>Hub activity</h3>
+
+          <div class="list">
+
+            <div class="row">
+              <div class="grow">
+                <b>Timesheet hours</b>
+                <div class="sub">Recorded in the Hub</div>
+              </div>
+              <strong>${timesheetHours}</strong>
+            </div>
+
+            <div class="row">
+              <div class="grow">
+                <b>Passed plant checks</b>
+                <div class="sub">Recorded checks</div>
+              </div>
+              <strong>${passedChecks}</strong>
+            </div>
+
+            <div class="row">
+              <div class="grow">
+                <b>Total daily reports</b>
+                <div class="sub">All submitted reports</div>
+              </div>
+              <strong>${reports.length}</strong>
+            </div>
+
+            <div class="row">
+              <div class="grow">
+                <b>Open defects</b>
+                <div class="sub">Plant & fleet</div>
+              </div>
+              <strong>${openDefects}</strong>
+            </div>
+
+          </div>
+        </div>
+
       </div>
+
+      <div class="panel">
+        <h3>Live jobs</h3>
+
+        <div class="list">
+          ${
+            jobs.length
+            ? jobs.map(j=>`
+              <div class="row">
+                <div class="grow">
+                  <b>${j.name}</b>
+                  <div class="sub">${j.location||'Location not set'}</div>
+                </div>
+                <span class="pill">${String(j.status||'ACTIVE').toUpperCase()}</span>
+              </div>
+            `).join('')
+            : '<p class="sub">No jobs have been added yet.</p>'
+          }
+        </div>
+      </div>
+
     </div>`;
 }
 
