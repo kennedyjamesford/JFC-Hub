@@ -1342,7 +1342,133 @@ async function management(){
     </div>`;
 }
 
-function social(){header('MARKETING DESK','Social media content');$('#content').innerHTML=`<div class="page"><div class="topline"><div><h3>Content planner</h3><p class="section-intro">Turn the team’s site progress into professional, on-brand updates.</p></div><button class="secondary" onclick="showModal('Create social post')">+ Create post</button></div><div class="grid cols-2"><div class="panel"><h3>Draft post · Instagram & LinkedIn</h3><p style="line-height:1.7">Another productive week at <b>Scorton Meadows</b>. The team are progressing the drainage installation and preparing the site for the next concrete pour — keeping things moving safely, efficiently and to programme.<br><br><span style="color:var(--blue)">#JamesFordConstruction #Groundworks #CivilEngineering #Yorkshire</span></p><div class="modal-actions"><button class="secondary" onclick="toast('Post saved as draft')">Save draft</button><button class="primary" style="background:var(--blue);color:#fff" onclick="toast('Post queued for approval')">Queue for approval</button></div></div><div class="panel"><h3>Content opportunities</h3><div class="list"><div class="row"><span class="row-icon">▣</span><div class="grow"><b>New site photos available</b><div class="sub">3 photos from Scorton Meadows — ideal for a progress update</div></div><button class="link" onclick="go('photos')">Use</button></div><div class="row"><span class="row-icon">✓</span><div class="grow"><b>Safety milestone</b><div class="sub">96% H&S compliance this month</div></div><button class="link" onclick="toast('Milestone draft created')">Draft</button></div></div></div></div></div>`}
+async function social(){
+  header('MARKETING DESK','Social media content');
+
+  const {data:jobs=[]}=await db
+    .from('jobs')
+    .select('id,name,status')
+    .order('name');
+
+  const {data:photoList=[]}=await db
+    .from('job_sheet_photos')
+    .select('id,file_name,created_at')
+    .order('created_at',{ascending:false})
+    .limit(10);
+
+  $('#content').innerHTML=`
+    <div class="page">
+
+      <div class="topline">
+        <div>
+          <h3>JFC content planner</h3>
+          <p class="section-intro">
+            Create professional, on-brand content from what's actually happening across JFC.
+          </p>
+        </div>
+      </div>
+
+      <div class="grid cols-2">
+
+        <div class="panel">
+          <h3>Write a post</h3>
+
+          <label>Choose a job</label>
+          <select id="socialJob" style="margin-bottom:14px">
+            <option value="">Select a job</option>
+            ${
+              jobs.map(j=>`
+                <option value="${j.name}">${j.name}</option>
+              `).join('')
+            }
+          </select>
+
+          <label>Post content</label>
+          <textarea
+            id="socialText"
+            rows="9"
+            placeholder="Write your JFC update here..."
+            style="width:100%;margin-top:6px"
+          ></textarea>
+
+          <div class="modal-actions" style="margin-top:14px">
+            <button class="secondary" onclick="toast('Draft kept on screen')">
+              Keep as draft
+            </button>
+            <button class="primary" onclick="toast('Ready to copy into Instagram or Facebook')">
+              Ready to post
+            </button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3>Live content opportunities</h3>
+
+          <div class="list">
+
+            <div class="row">
+              <span class="row-icon">⌑</span>
+              <div class="grow">
+                <b>${jobs.length} live jobs</b>
+                <div class="sub">Choose a current JFC site for your next update.</div>
+              </div>
+            </div>
+
+            <div class="row">
+              <span class="row-icon">▣</span>
+              <div class="grow">
+                <b>${photoList.length} recent site photos</b>
+                <div class="sub">Photos uploaded through job sheets.</div>
+              </div>
+              <button class="link" onclick="go('photos')">View</button>
+            </div>
+
+            <div class="row">
+              <span class="row-icon">✓</span>
+              <div class="grow">
+                <b>Team & safety content</b>
+                <div class="sub">Share training, machinery, site progress and team moments.</div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+
+      <div class="panel" style="margin-top:18px">
+        <h3>Easy JFC content ideas</h3>
+
+        <div class="tool-grid">
+          <article class="tool-card">
+            <div class="tool-icon">📸</div>
+            <h3>Site progress</h3>
+            <p>Show what the team has achieved this week.</p>
+          </article>
+
+          <article class="tool-card">
+            <div class="tool-icon">🚜</div>
+            <h3>Plant & machinery</h3>
+            <p>Showcase the kit working across your sites.</p>
+          </article>
+
+          <article class="tool-card">
+            <div class="tool-icon">👷</div>
+            <h3>Meet the team</h3>
+            <p>Put the people behind JFC at the centre of the story.</p>
+          </article>
+
+          <article class="tool-card">
+            <div class="tool-icon">🦺</div>
+            <h3>Safety & training</h3>
+            <p>Share the work that keeps the team safe.</p>
+          </article>
+        </div>
+      </div>
+
+    </div>`;
+}
+
 
 function toast(message){
   const t=$('#toast');
