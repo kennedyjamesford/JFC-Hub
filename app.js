@@ -1249,7 +1249,99 @@ for(const file of photoFiles){
   };
 }
 
-function management(){header('MANAGEMENT OVERVIEW','Company overview');$('#content').innerHTML=`<div class="page"><section class="stats"><div class="stat"><span class="label">LIVE REVENUE</span><strong>£284k</strong><span class="trend">Across 3 active jobs</span></div><div class="stat"><span class="label">LABOUR THIS WEEK</span><strong>216h</strong><span class="trend">88% productive time</span></div><div class="stat"><span class="label">JOB COST VARIANCE</span><strong>+2.4%</strong><span class="trend" style="color:#db8b1a">Monitor Scorton concrete</span></div><div class="stat"><span class="label">PLANT UTILISATION</span><strong>78%</strong><span class="trend">3 assets available</span></div></section><div class="grid cols-2"><div class="panel"><h3>Job costing snapshot</h3><table class="table"><thead><tr><th>JOB</th><th>CONTRACT</th><th>COST TO DATE</th><th>FORECAST</th></tr></thead><tbody>${[['The Old Mill','£126,000','£86,420','On target'],['Scorton Meadows','£98,500','£41,360','+2.4%'],['Riverside Barns','£59,500','£3,200','On target']].map(x=>`<tr><td><b>${x[0]}</b></td><td>${x[1]}</td><td>${x[2]}</td><td><span class="pill ${x[3][0]==='+'?'amber':''}">${x[3]}</span></td></tr>`).join('')}</tbody></table></div><div class="panel"><h3>Company team overview</h3><div class="where">${team.map((x,i)=>`<div class="where-item"><div class="avatar">${initials(x[0])}</div><div><b>${x[0]}</b><div class="sub">${x[1]} · ${x[0]==='Kennedy'?'Office / social content':i<5?'Management':'Operations'}</div></div><span class="pill">${x[0]==='Kennedy'?'OFFICE':i<5?'MANAGEMENT':'TEAM'}</span></div>`).join('')}</div></div></div></div>`}
+async function management(){
+  header('MANAGEMENT OVERVIEW','Company overview');
+
+  const [
+    {data:staff=[]},
+    {data:jobs=[]},
+    {data:checks=[]},
+    {data:defects=[]}
+  ] = await Promise.all([
+    db.from('staff').select('full_name,job_title,role,active').eq('active',true).order('full_name'),
+    db.from('jobs').select('name,status').order('name'),
+    db.from('plant_checks').select('id,status,created_at').order('created_at',{ascending:false}).limit(100),
+    db.from('plant_defects').select('id,status,reported_at').order('reported_at',{ascending:false}).limit(100)
+  ]);
+
+  const openDefects=defects.filter(d=>d.status==='open').length;
+  const passedChecks=checks.filter(c=>c.status==='passed').length;
+
+  $('#content').innerHTML=`
+    <div class="page">
+
+      <section class="stats">
+
+        <div class="stat">
+          <span class="label">ACTIVE STAFF</span>
+          <strong>${staff.length}</strong>
+          <span class="trend">Live staff records</span>
+        </div>
+
+        <div class="stat">
+          <span class="label">LIVE JOBS</span>
+          <strong>${jobs.length}</strong>
+          <span class="trend">Jobs in the Hub</span>
+        </div>
+
+        <div class="stat">
+          <span class="label">OPEN DEFECTS</span>
+          <strong>${openDefects}</strong>
+          <span class="trend">Plant & fleet</span>
+        </div>
+
+        <div class="stat">
+          <span class="label">PASSED CHECKS</span>
+          <strong>${passedChecks}</strong>
+          <span class="trend">Recorded in the Hub</span>
+        </div>
+
+      </section>
+
+      <div class="grid cols-2">
+
+        <div class="panel">
+          <h3>Live jobs</h3>
+
+          <div class="list">
+            ${
+              jobs.length
+              ? jobs.map(j=>`
+                <div class="row">
+                  <div class="grow">
+                    <b>${j.name}</b>
+                  </div>
+                  <span class="pill">${String(j.status||'ACTIVE').toUpperCase()}</span>
+                </div>
+              `).join('')
+              : '<p class="sub">No jobs have been added yet.</p>'
+            }
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3>Company team</h3>
+
+          <div class="where">
+            ${
+              staff.map(s=>`
+                <div class="where-item">
+                  <div class="avatar">${initials(s.full_name)}</div>
+                  <div>
+                    <b>${s.full_name}</b>
+                    <div class="sub">${s.job_title||s.role}</div>
+                  </div>
+                  <span class="pill">${String(s.role||'STAFF').toUpperCase()}</span>
+                </div>
+              `).join('')
+            }
+          </div>
+        </div>
+
+      </div>
+    </div>`;
+}
+
 function social(){header('MARKETING DESK','Social media content');$('#content').innerHTML=`<div class="page"><div class="topline"><div><h3>Content planner</h3><p class="section-intro">Turn the team’s site progress into professional, on-brand updates.</p></div><button class="secondary" onclick="showModal('Create social post')">+ Create post</button></div><div class="grid cols-2"><div class="panel"><h3>Draft post · Instagram & LinkedIn</h3><p style="line-height:1.7">Another productive week at <b>Scorton Meadows</b>. The team are progressing the drainage installation and preparing the site for the next concrete pour — keeping things moving safely, efficiently and to programme.<br><br><span style="color:var(--blue)">#JamesFordConstruction #Groundworks #CivilEngineering #Yorkshire</span></p><div class="modal-actions"><button class="secondary" onclick="toast('Post saved as draft')">Save draft</button><button class="primary" style="background:var(--blue);color:#fff" onclick="toast('Post queued for approval')">Queue for approval</button></div></div><div class="panel"><h3>Content opportunities</h3><div class="list"><div class="row"><span class="row-icon">▣</span><div class="grow"><b>New site photos available</b><div class="sub">3 photos from Scorton Meadows — ideal for a progress update</div></div><button class="link" onclick="go('photos')">Use</button></div><div class="row"><span class="row-icon">✓</span><div class="grow"><b>Safety milestone</b><div class="sub">96% H&S compliance this month</div></div><button class="link" onclick="toast('Milestone draft created')">Draft</button></div></div></div></div></div>`}
 
 function toast(message){
