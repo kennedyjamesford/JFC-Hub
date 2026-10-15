@@ -1823,6 +1823,64 @@ async function management(){
 async function social(){
   header('MARKETING DESK','Social media content');
 
+  const {data:jobs=[]}=await db.from('jobs').select('id,name,status').order('name');
+  const {data:photos=[]}=await db.from('job_sheet_photos').select('id').limit(10);
+  const saved=JSON.parse(localStorage.getItem('jfc-social-draft')||'null')||{job:'',text:'',status:'Draft'};
+
+  $('#content').innerHTML=`
+    <div class="page">
+      <div class="panel">
+        <h3>JFC content planner</h3>
+        <label>Choose a job</label>
+        <select id="socialJob">
+          <option value="">Select a job</option>
+          ${jobs.map(j=>`<option value="${j.name}" ${saved.job===j.name?'selected':''}>${j.name}</option>`).join('')}
+        </select>
+        <label>Post content</label>
+        <textarea id="socialText" rows="9" style="width:100%;margin-top:8px" placeholder="Write your JFC update here...">${saved.text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</textarea>
+        <p id="draftStatus" class="sub">Saved status: ${saved.status}</p>
+        <div class="modal-actions">
+          <button class="secondary" id="saveDraft">Save draft</button>
+          <button class="primary" id="copyPost">Copy post</button>
+        </div>
+      </div>
+      <div class="panel" style="margin-top:18px">
+        <h3>Content opportunities</h3>
+        <p>${jobs.length} live jobs available for posts.</p>
+        <p>${photos.length} site photos available in the photo log.</p>
+        <button class="secondary" onclick="go('photos')">View site photos</button>
+      </div>
+    </div>`;
+
+  function saveDraft(status){
+    const draft={
+      job:$('#socialJob').value,
+      text:$('#socialText').value,
+      status
+    };
+    localStorage.setItem('jfc-social-draft',JSON.stringify(draft));
+    $('#draftStatus').textContent='Saved status: '+status+' (this device)';
+    toast('Social post saved');
+  }
+
+  $('#saveDraft').onclick=()=>saveDraft('Draft');
+  $('#copyPost').onclick=async()=>{
+    const text=$('#socialText').value.trim();
+    if(!text){toast('Write your post first');return;}
+    saveDraft('Ready to post');
+    try{
+      await navigator.clipboard.writeText(text);
+      toast('Post copied — ready to paste');
+    }catch(e){
+      $('#socialText').focus();
+      $('#socialText').select();
+      toast('Post selected — press Ctrl+C to copy');
+    }
+  };
+}
+
+  header('MARKETING DESK','Social media content');
+
   const {data:jobs=[]}=await db
     .from('jobs')
     .select('id,name,status')
