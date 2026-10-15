@@ -8,7 +8,90 @@ function boot(){$('#teamGrid').innerHTML=team.map((x,i)=>`<button class="team-ca
 function select(p){user=p;localStorage.setItem('jfc-user',JSON.stringify(p));$('#loginScreen').classList.add('hidden');$('#app').classList.remove('hidden');$('#userName').textContent=p[0].split(' ')[0];$('#profileButton').textContent=initials(p[0]);go('home')}
 const header=(label,title)=>{$('#headerLabel').textContent=label;$('#pageTitle').innerHTML=title;document.querySelectorAll('#nav button').forEach(x=>x.classList.toggle('active',x.dataset.view===view));$('.sidebar').classList.remove('open')};
 function go(v){view=v;let render={home:home,time:time,jobs:jobsView,photos:photos,plant:plant,docs:docs,reports:reports,management:management,social:social}[v];render()}
-function home(){header('OPERATIONS OVERVIEW',`Good morning, <span>${user[0].split(' ')[0]}</span>`);$('#content').innerHTML=`<div class="page"><div class="topline"><div><h3>Wednesday, 16 September</h3><div class="date">Here’s the latest across James Ford Construction.</div></div><button class="secondary" onclick="go('reports')">View daily report →</button></div><section class="hero"><div><p class="eyebrow" style="color:#bdd9f3">TODAY'S SHIFT</p><h3>${clockedIn?'You are clocked in':'Ready to start your day?'}</h3><p>${clockedIn?'Clocked in at 07:24 · Scorton Meadows':'Select a site and clock in when you arrive.'}</p></div><div class="clock"><div class="clock-time">${new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}</div><button class="primary" onclick="toggleClock()">${clockedIn?'Clock out':'Clock in'}</button></div></section><section class="stats"><div class="stat"><span class="label">TEAM ON SITE</span><strong>12 <small>/ 16</small></strong><span class="trend">↑ 2 since yesterday</span></div><div class="stat"><span class="label">ACTIVE JOBS</span><strong>3</strong><span class="trend">All on programme</span></div><div class="stat"><span class="label">OPEN DEFECTS</span><strong>2</strong><span class="trend" style="color:#db8b1a">Needs review today</span></div><div class="stat"><span class="label">H&S COMPLIANCE</span><strong>96%</strong><span class="trend">↑ 3% this month</span></div></section><section class="grid cols-2"><div class="panel"><div class="panel-head"><h3>Today’s priorities</h3><button class="link" onclick="showModal('Add priority')">+ Add</button></div><div class="list"><div class="row"><span class="row-icon">▣</span><div class="grow"><div class="row-title">Concrete pour — Scorton Meadows</div><div class="sub">Due 10:30 · Connor Bell</div></div><span class="pill amber">IN PROGRESS</span></div><div class="row"><span class="row-icon">⚙</span><div class="grow"><div class="row-title">Daily check — JCB 3CX</div><div class="sub">Due before 08:00 · Sam Brown</div></div><span class="pill">COMPLETE</span></div><div class="row"><span class="row-icon">▤</span><div class="grow"><div class="row-title">RAMS review — Riverside Barns</div><div class="sub">Due today · Dylan Hutcheon</div></div><span class="pill red">ACTION</span></div></div></div><div class="panel"><div class="panel-head"><h3>Who’s where</h3><button class="link" onclick="go('management')">Full view →</button></div><div class="where">${[['CB','Connor Bell','Scorton Meadows',80],['BH','Ben Hall','Scorton Meadows',65],['LG','Lewis Gray','The Old Mill',50],['SB','Sam Brown','Yard / Plant',38]].map(x=>`<div class="where-item"><div class="avatar">${x[0]}</div><div><b>${x[1]}</b><div class="sub">${x[2]}<div class="progress"><i style="width:${x[3]}%"></i></div></div></div><span class="pill">ON SITE</span></div>`).join('')}</div></div></section><section class="panel" style="margin-top:18px"><div class="panel-head"><h3>Quick actions</h3></div><div class="action-grid"><button class="quick" onclick="toggleClock()"><b>◷ ${clockedIn?'Clock out':'Clock in'}</b>Record today’s attendance</button><button class="quick" onclick="go('plant')"><b>⚙ Plant check</b>Complete a daily inspection</button><button class="quick" onclick="go('photos')"><b>▣ Add site photo</b>Upload progress evidence</button></div></section></div>`}
+async function home(){
+  header('OPERATIONS OVERVIEW',`Good morning, <span>${user[0].split(' ')[0]}</span>`);
+  $('#content').innerHTML='<div class="page"><div class="panel">Loading live JFC information…</div></div>';
+
+  const [
+    {data:staff=[]},
+    {data:jobs=[]},
+    {data:reports=[]},
+    {data:defects=[]}
+  ] = await Promise.all([
+    db.from('staff').select('id,full_name,active').eq('active',true).order('full_name'),
+    db.from('jobs').select('id,name,location,status').order('name'),
+    db.from('job_sheets').select('id,job_id,staff_id,work_date,hours_on_site,status').order('work_date',{ascending:false}).limit(100),
+    db.from('plant_defects').select('id,status,reported_at,category,description').order('reported_at',{ascending:false}).limit(100)
+  ]);
+
+  const now=new Date();
+  const today=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
+  const todayReports=reports.filter(r=>r.work_date===today);
+  const openDefects=defects.filter(d=>String(d.status||'').toLowerCase()==='open');
+  const activeJobs=jobs.filter(j=>!['complete','completed','closed'].includes(String(j.status||'').toLowerCase()));
+  const reportedIds=new Set(todayReports.map(r=>r.job_id));
+  const dueJobs=activeJobs.filter(j=>!reportedIds.has(j.id));
+  const jobName=id=>jobs.find(j=>j.id===id)?.name||'Job site';
+  const staffName=id=>staff.find(s=>s.id===id)?.full_name||'Team member';
+  const recentReports=todayReports.slice(0,4);
+
+  $('#content').innerHTML=`
+    <div class="page">
+      <div class="topline">
+        <div>
+          <h3>${now.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'})}</h3>
+          <div class="date">Live information from the James Ford Construction Hub.</div>
+        </div>
+        <button class="secondary" onclick="go('reports')">Daily reports →</button>
+      </div>
+
+      <section class="hero">
+        <div>
+          <p class="eyebrow" style="color:#bdd9f3">JFC HUB</p>
+          <h3>Ready for the day?</h3>
+          <p>Record hours, complete checks and submit site information.</p>
+        </div>
+        <div class="clock">
+          <div class="clock-time">${now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}</div>
+          <button class="primary" onclick="go('time')">Open timesheet</button>
+        </div>
+      </section>
+
+      <section class="stats">
+        <div class="stat"><span class="label">ACTIVE STAFF</span><strong>${staff.length}</strong><span class="trend">Live staff records</span></div>
+        <div class="stat"><span class="label">ACTIVE JOBS</span><strong>${activeJobs.length}</strong><span class="trend">From jobs register</span></div>
+        <div class="stat"><span class="label">REPORTS TODAY</span><strong>${todayReports.length}</strong><span class="trend">${todayReports.reduce((n,r)=>n+(Number(r.hours_on_site)||0),0)} hours recorded</span></div>
+        <div class="stat"><span class="label">OPEN DEFECTS</span><strong>${openDefects.length}</strong><span class="trend">${openDefects.length?'Needs review':'No open defects recorded'}</span></div>
+      </section>
+
+      <section class="grid cols-2">
+        <div class="panel">
+          <div class="panel-head"><h3>Jobs needing a daily report</h3><button class="link" onclick="go('management')">Management →</button></div>
+          <div class="list">
+            ${dueJobs.length?dueJobs.slice(0,6).map(j=>`<div class="row"><span class="row-icon">▣</span><div class="grow"><div class="row-title">${j.name}</div><div class="sub">${j.location||'Location not set'} · No report recorded today</div></div><span class="pill amber">REPORT DUE</span></div>`).join(''):'<p class="sub">All active jobs have a report recorded today.</p>'}
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h3>Recent reports today</h3><button class="link" onclick="go('reports')">View reports →</button></div>
+          <div class="list">
+            ${recentReports.length?recentReports.map(r=>`<div class="row"><span class="row-icon">▤</span><div class="grow"><div class="row-title">${jobName(r.job_id)}</div><div class="sub">${staffName(r.staff_id)} · ${Number(r.hours_on_site)||0} hours</div></div><span class="pill">SUBMITTED</span></div>`).join(''):'<p class="sub">No daily reports have been submitted today yet.</p>'}
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" style="margin-top:18px">
+        <div class="panel-head"><h3>Quick actions</h3></div>
+        <div class="action-grid">
+          <button class="quick" onclick="go('time')"><b>◷ Weekly timesheet</b>Record this week’s hours</button>
+          <button class="quick" onclick="go('plant')"><b>⚙ Plant & fleet</b>Complete checks or report a defect</button>
+          <button class="quick" onclick="go('photos')"><b>▣ Site photos</b>View uploaded site evidence</button>
+          <button class="quick" onclick="go('reports')"><b>▤ Daily reports</b>Submit or review site reports</button>
+        </div>
+      </section>
+    </div>`;
+}
+
 async function time(){
   header('ATTENDANCE','Weekly timesheet');
 
