@@ -1232,56 +1232,7 @@ async function docs(){
   });
 }
 
-  header('COMPLIANCE LIBRARY','RAMS & documents');
-
-  $('#content').innerHTML=`
-    <div class="page">
-      <div class="topline">
-        <div>
-          <h3>JFC document library</h3>
-          <p class="section-intro">Approved RAMS, policies, COSHH assessments, permits and site documents.</p>
-        </div>
-      </div>
-
-      <div class="panel">
-        <h3>Document library ready</h3>
-        <p class="section-intro">
-          This library is ready for the real JFC documents. The previous documents were demonstration content, so they have been removed rather than showing staff documents that do not actually exist in the Hub.
-        </p>
-
-        <div class="tool-grid" style="margin-top:18px">
-          <article class="tool-card">
-            <div class="tool-icon">▤</div>
-            <h3>RAMS</h3>
-            <p>Risk assessments and method statements.</p>
-          </article>
-
-          <article class="tool-card">
-            <div class="tool-icon">✓</div>
-            <h3>Health & Safety</h3>
-            <p>Company policies and safety procedures.</p>
-          </article>
-
-          <article class="tool-card">
-            <div class="tool-icon">◫</div>
-            <h3>COSHH</h3>
-            <p>COSHH assessments and related records.</p>
-          </article>
-
-          <article class="tool-card">
-            <div class="tool-icon">⚠</div>
-            <h3>Permits & site packs</h3>
-            <p>Site-specific controlled documents.</p>
-          </article>
-        </div>
-
-        <p class="sub" style="margin-top:18px">
-          Once you have the real PDFs, we can add them here so the team can open the current approved version from the Hub.
-        </p>
-      </div>
-    </div>`;
-}
-
+ 
 async function viewJobSheet(id){
   const { data:sheet, error } = await db
     .from('job_sheets')
