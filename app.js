@@ -325,7 +325,7 @@ async function jobsView(){
       <div class="card-row">
         ${jobList.length
           ? jobList.map(j=>`
-            <article class="site-card">
+            <article class="site-card" style="cursor:pointer" onclick="openJob('${j.id}')">
               <div class="site-image">${j.name}</div>
               <div>
                 <h3>${j.name}</h3>
@@ -334,6 +334,55 @@ async function jobsView(){
               </div>
             </article>`).join('')
           : '<div class="panel"><p class="sub">No jobs have been added yet.</p></div>'}
+      </div>
+    </div>`;
+}
+
+async function openJob(id){
+  const {data:job,error}=await db.from('jobs')
+    .select('id,name,location,status,created_at')
+    .eq('id',id)
+    .maybeSingle();
+
+  if(error||!job){
+    toast('Could not open this job. Please try again.');
+    return;
+  }
+
+  const {data:reports=[]}=await db.from('job_sheets')
+    .select('id,work_date,status')
+    .eq('job_id',id)
+    .order('work_date',{ascending:false})
+    .limit(10);
+
+  $('#content').innerHTML=`
+    <div class="page">
+      <div class="topline">
+        <div>
+          <h3>${job.name}</h3>
+          <p class="section-intro">Job and site details</p>
+        </div>
+        <button class="secondary" onclick="jobsView()">← Back to Jobs & Sites</button>
+      </div>
+      <div class="grid cols-2" style="margin-top:18px">
+        <div class="panel">
+          <h3>Site details</h3>
+          <p><b>Job / site:</b> ${job.name}</p>
+          <p><b>Location:</b> ${job.location||'Location not set'}</p>
+          <p><b>Status:</b> ${String(job.status||'Active').toUpperCase()}</p>
+        </div>
+        <div class="panel">
+          <h3>Recent job sheets</h3>
+          ${reports.length ? reports.map(r=>`
+            <div class="row" style="padding:12px 0">
+              <div class="grow">
+                <b>${r.work_date||'Undated job sheet'}</b>
+                <div class="sub">${r.status||'Submitted'}</div>
+              </div>
+              <button class="secondary" onclick="viewJobSheet('${r.id}')">View</button>
+            </div>
+          `).join(''):'<p class="sub">No job sheets recorded for this site yet.</p>'}
+        </div>
       </div>
     </div>`;
 }
