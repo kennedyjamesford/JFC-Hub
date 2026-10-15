@@ -349,7 +349,7 @@ async function openJob(id){
     return;
   }
 
-  const {data:reports=[]}=await db.from('job_sheets')
+  const {data:reports=[],error:reportsError}=await db.from('job_sheets')
     .select('id,work_date,status')
     .eq('job_id',id)
     .order('work_date',{ascending:false})
@@ -366,14 +366,25 @@ async function openJob(id){
       </div>
       <div class="grid cols-2" style="margin-top:18px">
         <div class="panel">
-          <h3>Site details</h3>
-          <p><b>Job / site:</b> ${job.name}</p>
-          <p><b>Location:</b> ${job.location||'Location not set'}</p>
-          <p><b>Status:</b> ${String(job.status||'Active').toUpperCase()}</p>
+          <h3>Edit site details</h3>
+          <form id="editJobForm">
+            <label for="editJobName">Job / site name</label>
+            <input id="editJobName" name="name" required>
+            <label for="editJobLocation">Site location</label>
+            <input id="editJobLocation" name="location" placeholder="Enter site address or location">
+            <label for="editJobStatus">Status</label>
+            <select id="editJobStatus" name="status">
+              <option value="Active">Active</option>
+              <option value="Planning">Planning</option>
+              <option value="Complete">Complete</option>
+            </select>
+            <button class="primary" type="submit" style="margin-top:14px">Save site details</button>
+          </form>
+          <p class="sub" style="margin-top:10px">Changes will be saved to the JFC Hub jobs register.</p>
         </div>
         <div class="panel">
           <h3>Recent job sheets</h3>
-          ${reports.length ? reports.map(r=>`
+          ${reportsError?'<p class="sub">Could not load job sheets.</p>':reports.length ? reports.map(r=>`
             <div class="row" style="padding:12px 0">
               <div class="grow">
                 <b>${r.work_date||'Undated job sheet'}</b>
@@ -385,7 +396,45 @@ async function openJob(id){
         </div>
       </div>
     </div>`;
+
+  $('#editJobName').value=job.name||'';
+  $('#editJobLocation').value=job.location||'';
+  $('#editJobStatus').value=['Active','Planning','Complete'].includes(job.status)?job.status:'Active';
+
+  $('#editJobForm').onsubmit=async event=>{
+    event.preventDefault();
+    const button=$('#editJobForm button[type="submit"]');
+    button.disabled=true;
+    button.textContent='Saving…';
+
+    const name=$('#editJobName').value.trim();
+    const location=$('#editJobLocation').value.trim()||null;
+    const status=$('#editJobStatus').value;
+
+    if(!name){
+      toast('Please enter a job or site name.');
+      button.disabled=false;
+      button.textContent='Save site details';
+      return;
+    }
+
+    const {error:saveError}=await db.from('jobs')
+      .update({name,location,status})
+      .eq('id',id);
+
+    if(saveError){
+      console.error(saveError);
+      toast('Could not save. Please try again.');
+      button.disabled=false;
+      button.textContent='Save site details';
+      return;
+    }
+
+    toast('Site details saved');
+    await openJob(id);
+  };
 }
+
 
 async function photos(){
   header('SITE RECORDS','Site photos');
