@@ -998,7 +998,240 @@ async function reportDefect(){
   };
 }
 
-function docs(){
+async function docs(){
+  header('COMPLIANCE LIBRARY','RAMS & documents');
+
+  const {data:{user:authUser}}=await db.auth.getUser();
+  if(!authUser){
+    $('#content').innerHTML='<div class="page"><div class="panel"><h3>Please sign in again.</h3></div></div>';
+    return;
+  }
+
+  const {data:staff,error:staffError}=await db
+    .from('staff').select('id,full_name,role')
+    .eq('auth_user_id',authUser.id).single();
+
+  if(staffError||!staff){
+    $('#content').innerHTML='<div class="page"><div class="panel"><h3>Your staff record could not be loaded.</h3></div></div>';
+    return;
+  }
+
+  const canManage=['management','admin'].includes(
+    String(staff.role||'').toLowerCase()
+  );
+  const categories=[
+    'RAMS','Health & Safety','COSHH','Permits & site packs'
+  ];
+  const esc=v=>String(v??'')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
+
+  const {data:documents=[],error}=await db
+    .from('company_documents')
+    .select('id,title,category,description,file_path,file_name,is_current,created_at')
+    .order('created_at',{ascending:false}).limit(500);
+
+  if(error){
+    console.error(error);
+    $('#content').innerHTML='<div class="page"><div class="panel"><h3>Could not load documents.</h3><p class="sub">Please refresh and try again.</p></div></div>';
+    return;
+  }
+
+  $('#content').innerHTML=`
+    <div class="page">
+      <div class="topline">
+        <div>
+          <h3>JFC document library</h3>
+          <p class="section-intro">Company documents and approved site packs.</p>
+        </div>
+      </div>
+
+      ${canManage?`
+      <div class="panel">
+        <h3>Upload a company PDF</h3>
+        <p class="sub">PDF only, maximum 20 MB.</p>
+        <form id="companyDocumentForm">
+          <label for="documentTitle">Document title</label>
+          <input id="documentTitle" required maxlength="160"
+            placeholder="e.g. Excavation RAMS — The Green">
+
+          <label for="documentCategory">Category</label>
+          <select id="documentCategory" required>
+            ${categories.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('')}
+          </select>
+
+          <label for="documentDescription">Notes (optional)</label>
+          <textarea id="documentDescription" rows="2"
+            maxlength="1000" placeholder="Site, revision or details"></textarea>
+
+          <label for="documentFile">Choose PDF</label>
+          <input id="documentFile" type="file"
+            accept=".pdf,application/pdf" required>
+
+          <div class="modal-actions">
+            <button class="primary" id="uploadDocumentButton" type="submit">Upload document</button>
+          </div>
+          <p id="documentUploadStatus" class="sub" aria-live="polite"></p>
+        </form>
+      </div>`:''}
+
+      <div class="panel" style="margin-top:18px">
+        <h3>Documents</h3>
+        <p class="sub">${documents.filter(d=>d.is_current).length} current documents</p>
+
+        <label for="documentSearch">Search</label>
+        <input id="documentSearch" placeholder="Search documents">
+
+        <label for="documentFilter">Category</label>
+        <select id="documentFilter">
+          <option value="">All categories</option>
+          ${categories.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('')}
+          ${canManage?'<option value="__retired">Retired versions</option>':''}
+        </select>
+
+        <div id="companyDocumentList" style="margin-top:14px"></div>
+      </div>
+    </div>`;
+
+  const list=$('#companyDocumentList');
+
+  function drawList(){
+    const term=$('#documentSearch').value.trim().toLowerCase();
+    const filter=$('#documentFilter').value;
+
+    const filtered=documents.filter(d=>{
+      if(!canManage&&!d.is_current)return false;
+      if(filter==='__retired'&&d.is_current)return false;
+      if(filter&&filter!=='__retired'&&d.category!==filter)return false;
+      return [d.title,d.category,d.description,d.file_name]
+        .some(v=>String(v||'').toLowerCase().includes(term));
+    });
+
+    if(!filtered.length){
+      list.innerHTML='<p class="sub">No matching documents yet.</p>';
+      return;
+    }
+
+    list.innerHTML=filtered.map(d=>`
+      <article class="panel" style="margin-top:10px">
+        <h3>${esc(d.title)}</h3>
+        <p class="sub">${esc(d.category)} · ${esc(d.file_name)}</p>
+        ${d.description?`<p>${esc(d.description)}</p>`:''}
+        <p><span class="pill ${d.is_current?'':'amber'}">${d.is_current?'CURRENT':'RETIRED'}</span></p>
+        <div class="modal-actions">
+          <button class="secondary" data-open-doc="${esc(d.id)}">Open PDF</button>
+          ${canManage&&d.is_current?`<button class="secondary" data-retire-doc="${esc(d.id)}">Retire</button>`:''}
+        </div>
+      </article>`).join('');
+  }
+
+  $('#documentSearch').addEventListener('input',drawList);
+  $('#documentFilter').addEventListener('change',drawList);
+  drawList();
+
+  list.addEventListener('click',async event=>{
+    const open=event.target.closest('[data-open-doc]');
+    const retire=event.target.closest('[data-retire-doc]');
+
+    if(open){
+      const doc=documents.find(d=>d.id===open.dataset.openDoc);
+      if(!doc)return;
+      const {data:signed,error}=await db.storage
+        .from('company-documents')
+        .createSignedUrl(doc.file_path,300);
+      if(error||!signed?.signedUrl){
+        toast('Could not open PDF');
+        return;
+      }
+      window.open(signed.signedUrl,'_blank','noopener');
+    }
+
+    if(retire&&canManage){
+      const doc=documents.find(d=>d.id===retire.dataset.retireDoc);
+      if(!doc||!confirm('Retire '+doc.title+'?'))return;
+      const {error}=await db.from('company_documents')
+        .update({is_current:false,updated_at:new Date().toISOString()})
+        .eq('id',doc.id);
+      if(error){toast('Could not retire document');return;}
+      doc.is_current=false;
+      toast('Document retired');
+      drawList();
+    }
+  });
+
+  const form=$('#companyDocumentForm');
+
+  if(form)form.addEventListener('submit',async event=>{
+    event.preventDefault();
+
+    const status=$('#documentUploadStatus');
+    const button=$('#uploadDocumentButton');
+    const file=$('#documentFile').files?.[0];
+    const title=$('#documentTitle').value.trim();
+    const category=$('#documentCategory').value;
+    const description=$('#documentDescription').value.trim();
+
+    if(!file||!title){
+      status.textContent='Enter a title and choose a PDF.';
+      return;
+    }
+    if(file.type!=='application/pdf'&&!file.name.toLowerCase().endsWith('.pdf')){
+      status.textContent='Please choose a PDF.';
+      return;
+    }
+    if(file.size>20*1024*1024){
+      status.textContent='The PDF must be 20 MB or smaller.';
+      return;
+    }
+
+    button.disabled=true;
+    status.textContent='Uploading PDF…';
+
+    const safeName=file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+    const path=`${authUser.id}/${Date.now()}-${safeName}`;
+
+    const {error:uploadError}=await db.storage
+      .from('company-documents')
+      .upload(path,file,{contentType:'application/pdf',upsert:false});
+
+    if(uploadError){
+      console.error(uploadError);
+      status.textContent='Upload failed: '+uploadError.message;
+      button.disabled=false;
+      return;
+    }
+
+    const {data:created,error:saveError}=await db
+      .from('company_documents')
+      .insert({
+        title,category,description:description||null,
+        file_path:path,file_name:file.name,
+        content_type:'application/pdf',
+        uploaded_by:staff.id,is_current:true
+      })
+      .select('id,title,category,description,file_path,file_name,is_current,created_at')
+      .single();
+
+    if(saveError){
+      console.error(saveError);
+      await db.storage.from('company-documents').remove([path]);
+      status.textContent='Could not save the document record.';
+      button.disabled=false;
+      return;
+    }
+
+    documents.unshift(created);
+    $('#documentTitle').value='';
+    $('#documentDescription').value='';
+    $('#documentFile').value='';
+    status.textContent='Document uploaded successfully.';
+    toast('Document uploaded');
+    drawList();
+    button.disabled=false;
+  });
+}
+
   header('COMPLIANCE LIBRARY','RAMS & documents');
 
   $('#content').innerHTML=`
