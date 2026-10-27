@@ -1815,6 +1815,108 @@ async function reports(){
 }
 
 
+async function viewWeeklyTimesheet(id){
+  const [{data:sheet,error},{data:entries=[]},{data:jobs=[]},{data:staff=[]}] = await Promise.all([
+    db.from('weekly_timesheets').select('*').eq('id',id).single(),
+    db.from('timesheet_entries').select('*').eq('timesheet_id',id).order('work_date'),
+    db.from('jobs').select('id,name'),
+    db.from('staff').select('id,full_name')
+  ]);
+
+  if(error || !sheet){
+    toast('Could not load timesheet');
+    return;
+  }
+
+  const person=staff.find(x=>x.id===sheet.staff_id);
+  const jobName=id=>{
+    const job=jobs.find(x=>x.id===id);
+    return job ? job.name : 'No job selected';
+  };
+  const total=entries.reduce((sum,e)=>sum+(Number(e.hours)||0),0);
+
+  header('ATTENDANCE','Weekly timesheet details');
+
+  $('#content').innerHTML=`
+    <div class="page">
+      <div class="panel">
+        <button class="secondary" onclick="management()">← Back to Management</button>
+        <h3>${person?person.full_name:'Employee'}</h3>
+        <p class="section-intro">
+          Week commencing ${new Date(sheet.week_commencing+'T12:00:00').toLocaleDateString('en-GB')}
+        </p>
+        <p>Status: <b>${String(sheet.status||'draft').toUpperCase()}</b></p>
+        <div style="overflow-x:auto">
+          <table>
+            <thead><tr><th>Date</th><th>Job / Site</th><th>Hours</th><th>Notes</th></tr></thead>
+            <tbody>
+              ${entries.map(e=>`
+                <tr>
+                  <td>${new Date(e.work_date+'T12:00:00').toLocaleDateString('en-GB')}</td>
+                  <td>${jobName(e.job_id)}</td>
+                  <td>${Number(e.hours)||0}</td>
+                  <td>${e.notes||'—'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+        <h3>Total hours: ${total}</h3>
+      </div>
+    </div>
+  `;
+}
+async function viewWeeklyTimesheet(id){
+  const [{data:sheet,error},{data:entries=[]},{data:jobs=[]},{data:staff=[]}] = await Promise.all([
+    db.from('weekly_timesheets').select('*').eq('id',id).single(),
+    db.from('timesheet_entries').select('*').eq('timesheet_id',id).order('work_date'),
+    db.from('jobs').select('id,name'),
+    db.from('staff').select('id,full_name')
+  ]);
+
+  if(error || !sheet){
+    toast('Could not load timesheet');
+    return;
+  }
+
+  const person=staff.find(x=>x.id===sheet.staff_id);
+  const jobName=id=>{
+    const job=jobs.find(x=>x.id===id);
+    return job ? job.name : 'No job selected';
+  };
+  const total=entries.reduce((sum,e)=>sum+(Number(e.hours)||0),0);
+
+  header('ATTENDANCE','Weekly timesheet details');
+
+  $('#content').innerHTML=`
+    <div class="page">
+      <div class="panel">
+        <button class="secondary" onclick="management()">← Back to Management</button>
+        <h3>${person?person.full_name:'Employee'}</h3>
+        <p class="section-intro">
+          Week commencing ${new Date(sheet.week_commencing+'T12:00:00').toLocaleDateString('en-GB')}
+        </p>
+        <p>Status: <b>${String(sheet.status||'draft').toUpperCase()}</b></p>
+        <div style="overflow-x:auto">
+          <table>
+            <thead><tr><th>Date</th><th>Job / Site</th><th>Hours</th><th>Notes</th></tr></thead>
+            <tbody>
+              ${entries.map(e=>`
+                <tr>
+                  <td>${new Date(e.work_date+'T12:00:00').toLocaleDateString('en-GB')}</td>
+                  <td>${jobName(e.job_id)}</td>
+                  <td>${Number(e.hours)||0}</td>
+                  <td>${e.notes||'—'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+        <h3>Total hours: ${total}</h3>
+      </div>
+    </div>
+  `;
+}
 
 async function management(){
   header('JFC CONTROL CENTRE','Live company overview');
@@ -2090,7 +2192,7 @@ async function management(){
                 const person=staff.find(x=>x.id===s.staff_id);
                 const status=String(s.status||'draft').toLowerCase();
                 return `
-                  <div class="row">
+                  <div class="row" onclick="viewWeeklyTimesheet('${s.id}')" style="cursor:pointer">
                     <div class="grow">
                       <b>${person?person.full_name:'Unknown employee'}</b>
                       <div class="sub">
