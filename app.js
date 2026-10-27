@@ -1846,6 +1846,8 @@ async function viewWeeklyTimesheet(id){
           Week commencing ${new Date(sheet.week_commencing+'T12:00:00').toLocaleDateString('en-GB')}
         </p>
         <p>Status: <b>${String(sheet.status||'draft').toUpperCase()}</b></p>
+${sheet.status==='submitted' ? `<button class="btn" onclick="approveWeeklyTimesheet('${sheet.id}')">Approve timesheet</button>` : ''}
+
         <div style="overflow-x:auto">
           <table>
             <thead><tr><th>Date</th><th>Job / Site</th><th>Hours</th><th>Notes</th></tr></thead>
@@ -1866,6 +1868,25 @@ async function viewWeeklyTimesheet(id){
     </div>
   `;
 }
+async function approveWeeklyTimesheet(id){
+  const {error}=await db
+    .from('weekly_timesheets')
+    .update({
+      status:'approved',
+      approved_at:new Date().toISOString()
+    })
+    .eq('id',id)
+    .eq('status','submitted');
+
+  if(error){
+    toast('Could not approve timesheet');
+    return;
+  }
+
+  toast('Timesheet approved');
+  await viewWeeklyTimesheet(id);
+}
+
 async function viewWeeklyTimesheet(id){
   const [{data:sheet,error},{data:entries=[]},{data:jobs=[]},{data:staff=[]}] = await Promise.all([
     db.from('weekly_timesheets').select('*').eq('id',id).single(),
