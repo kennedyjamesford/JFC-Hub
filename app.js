@@ -1825,14 +1825,16 @@ async function management(){
     {data:checks=[]},
     {data:defects=[]},
     {data:reports=[]},
-    {data:timesheets=[]}
+    {data:timesheets=[]},
+    {data:weeklySheets=[],error:weeklySheetsError}
   ] = await Promise.all([
     db.from('staff').select('id,full_name,job_title,role,active').eq('active',true).order('full_name'),
     db.from('jobs').select('id,name,status,location').order('name'),
     db.from('plant_checks').select('id,status,created_at').order('created_at',{ascending:false}).limit(100),
     db.from('plant_defects').select('id,status,reported_at,category,description').order('reported_at',{ascending:false}).limit(100),
     db.from('job_sheets').select('id,job_id,staff_id,work_date,hours_on_site,status').order('work_date',{ascending:false}).limit(100),
-    db.from('timesheet_entries').select('id,hours,work_date').limit(500)
+    db.from('timesheet_entries').select('id,hours,work_date').limit(500),
+    db.from('weekly_timesheets').select('id,staff_id,week_commencing,status,submitted_at').order('week_commencing',{ascending:false}).limit(100)
   ]);
 
   const now=new Date();
@@ -2077,6 +2079,32 @@ async function management(){
           </div>
         </div>
 
+      </div>
+<div class="panel">
+        <h3>Weekly timesheets</h3>
+        <p class="section-intro">Weekly submissions from the team.</p>
+        <div class="list">
+          ${
+            weeklySheets.length
+            ? weeklySheets.map(s=>{
+                const person=staff.find(x=>x.id===s.staff_id);
+                const status=String(s.status||'draft').toLowerCase();
+                return `
+                  <div class="row">
+                    <div class="grow">
+                      <b>${person?person.full_name:'Unknown employee'}</b>
+                      <div class="sub">
+                        Week commencing ${new Date(s.week_commencing+'T12:00:00').toLocaleDateString('en-GB')}
+                        ${s.submitted_at?' · Submitted '+new Date(s.submitted_at).toLocaleDateString('en-GB'):''}
+                      </div>
+                    </div>
+                    <span class="pill ${status==='approved'?'':'amber'}">${status.toUpperCase()}</span>
+                  </div>
+                `;
+              }).join('')
+            : '<p class="sub">No weekly timesheets submitted yet.</p>'
+          }
+        </div>
       </div>
 
       <div class="panel">
