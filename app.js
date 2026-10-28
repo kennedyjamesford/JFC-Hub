@@ -1845,8 +1845,8 @@ async function viewWeeklyTimesheet(id){
         <p class="section-intro">
           Week commencing ${new Date(sheet.week_commencing+'T12:00:00').toLocaleDateString('en-GB')}
         </p>
-        <p>Status: <b>${String(sheet.status||'draft').toUpperCase()}</b></p>
-${sheet.status==='submitted' ? `<button class="btn" onclick="approveWeeklyTimesheet('${sheet.id}')">Approve timesheet</button>` : ''}
+        <p>Status: <b>${String(sheet.status||'draft').toUpperCase()}</b></p>${sheet.status==='submitted' ? `<button class="btn" onclick="approveWeeklyTimesheet('${sheet.id}')">Approve timesheet</button>` : ''}
+
 
         <div style="overflow-x:auto">
           <table>
